@@ -31,7 +31,8 @@ os.environ.setdefault("OPENGLCONTEXT_BACKEND", "glfw")
 from OpenGLContext import testingcontext, quaternion
 from OpenGLContext.loaders.tiles3d import vegetation
 from OpenGLContext.scenegraph.terrain import HeightField, SplatTerrain
-from OpenGLContext.scenegraph.vegetation import InstancedBillboards, InstancedMeshLOD, world_grid_scatter
+from OpenGLContext.scenegraph.vegetation import (
+    InstancedBillboards, InstancedMeshLOD, InstancedClumps, load_clump_glb, world_grid_scatter)
 from OpenGLContext.move.terrainwalk import TerrainWalkMixin
 BaseContext = testingcontext.getInteractive()
 from OpenGLContext.scenegraph.basenodes import sceneGraph, Background, Shape, Appearance, Material
@@ -89,6 +90,25 @@ class Forest(TerrainWalkMixin, BaseContext):
         hfn = hf.sample
         terrain_geom = SplatTerrain(hf, LAYERS, CONTROL)
         terrain = _shape(terrain_geom)
+
+        # Grass grows on any soft ground (forest floor, meadow, moss) but NOT on rock:
+        # scatter is thinned by (1 - rock weight) from the control map, so it stays lush
+        # where you walk yet vanishes on bare mountainsides instead of dotting them with
+        # green blobs. Reuses the HeightField bilinear sampler over the terrain extent.
+        from PIL import Image
+        _ctl = np.asarray(Image.open(CONTROL).convert("RGBA").resize((RES, RES), Image.LANCZOS),
+                          np.float32) / 255.0
+        _grass_allowed = np.clip(1.0 - _ctl[..., LAYERS.index("rock")], 0.0, 1.0)
+        _rock_mask = HeightField(_grass_allowed, EXTENT, 1.0).sample
+
+        def _grass_mask(px, pz):
+            # thin grass out on steep ground: on a slope a wide clump's uphill side
+            # buries under the terrain (only blade tips show), and steep rock faces
+            # shouldn't be grassed anyway. slope is rise/run; full grass below ~29deg,
+            # gone by ~49deg.
+            steep = 1.0 - np.clip((self.hf.slope(px, pz) - 0.55) / 0.60, 0.0, 1.0)
+            return _rock_mask(px, pz) * steep
+        self._grass_mask = _grass_mask
 
         # spawn on a gentle, walkable spot (so we stand among trees, not on a cliff)
         ex, ez = -200.0, 300.0
@@ -178,19 +198,48 @@ class Forest(TerrainWalkMixin, BaseContext):
         print("forest: %d trees (%d fir + %d noel pine conifers, %d maple, %d realistic) — all with near-mesh LOD" % (
             N, fir_only.sum(), noel.sum(), maple.sum(), realistic.sum()))
 
-        # camera-following grass, two LODs (streamed as the viewer moves):
-        #  near = fine dense tufts out to 95m; far = coarse sparse clumps 90->340m
-        #  that fill the mid-distance ground so it isn't bare texture past the near disc.
+        # Grass LOD chain (all camera-following, streamed as the viewer moves):
+        #   near  = real-geometry clumps 0->R, dither-dissolving out at the disc edge;
+        #   mid   = impostor billboards baked from the clump, fading IN at R (near_cut)
+        #           exactly where the clumps fade out, out to 95m;
+        #   far   = coarse sparse impostor billboards 90->340m.
+        # Mid/far use the clump-baked impostor (grass_clump_imp.png) so their colour
+        # matches the clumps and the geometry->billboard handoff is invisible. Falls
+        # back to the legacy grass.png if the impostor hasn't been baked.
+        self._clump_radius = float(os.environ.get("CLUMP_RADIUS", "30.0"))
+        # The far grass disc's outer edge follows the camera; against open ground its
+        # fade band reads as a "carpet growing in" as you walk. Pushing the radius out
+        # puts that edge far away (smaller on screen, and the fade band is ~15% of the
+        # radius so it widens with it) where perspective + fog hide it.
+        self._grass_far_radius = float(os.environ.get("GRASS_FAR_RADIUS", "700.0"))
+        imp = "grass_clump_imp.png" if os.path.exists(A("grass_clump_imp.png")) else "grass.png"
+        # grass billboards use a low flat sun term (env GRASS_SUN) so they match the
+        # dark, per-fragment-lit clump geometry rather than reading as bright neon lumps.
+        gsun = float(os.environ.get("GRASS_SUN", "0.36"))
         self._grass = InstancedBillboards(np.zeros((0, 3), 'f4'), np.zeros(0, 'f4'), np.zeros(0, 'f4'),
-                                          A("grass.png"), width=0.5, far_fade=95.0)
+                                          A(imp), width=2.6, far_fade=95.0, near_cut=self._clump_radius,
+                                          sun_level=gsun)
         self._grass_far = InstancedBillboards(np.zeros((0, 3), 'f4'), np.zeros(0, 'f4'), np.zeros(0, 'f4'),
-                                              A("grass.png"), width=1.7, far_fade=340.0, near_cut=90.0)
+                                              A(imp), width=2.6, far_fade=self._grass_far_radius,
+                                              near_cut=90.0, sun_level=gsun)
 
+        # near-field real-geometry grass clumps: authored blade clumps instanced within
+        # R, fading out across [0.8R, R] as the mid billboards fade in.
+        self._clumps = None
+        clump_glb = os.path.join(HERE, "..", "..", "..", "grass-clumps", "basic-clump.glb")
+        if os.path.exists(clump_glb):
+            cP, cN, cUV, cIdx, cTex = load_clump_glb(clump_glb)
+            self._clumps = InstancedClumps(cP, cN, cUV, cIdx, cTex, sun=(-0.5, -0.72, -0.48),
+                                           fade_start=self._clump_radius * 0.8, fade_end=self._clump_radius)
+            print("grass clumps: %d tris/clump from %s" % (len(cIdx) // 3, os.path.basename(clump_glb)))
+
+        clump_nodes = [_shape(self._clumps)] if self._clumps is not None else []
+        bb_grass = [_shape(self._grass_far), _shape(self._grass)]
         self.sg = sceneGraph(children=[
             Background(skyColor=[[0.28, 0.46, 0.72], [0.52, 0.66, 0.82], [0.80, 0.87, 0.93]],
                        skyAngle=[1.15, 1.5708],
                        groundColor=[[0.68, 0.76, 0.80], [0.62, 0.70, 0.74]], groundAngle=[1.5708]),
-            terrain, _shape(self._grass_far), _shape(self._grass)] + tree_nodes)
+            terrain] + bb_grass + clump_nodes + tree_nodes)
 
         if self.platform is not None:
             self.platform.setFrustum(math.radians(62), None, 0.25, 9000.0)
@@ -214,12 +263,25 @@ class Forest(TerrainWalkMixin, BaseContext):
         self.add_stream(40.0, self._stream_far)
 
     def _stream_near(self, x, z):
-        p, y, s = world_grid_scatter(x, z, 95.0, 2.6, self.hf)
+        # mid grass billboards: same short height as the clumps, and dense enough to
+        # overlap into continuous cover so the band doesn't read as sparse tufts where
+        # the clump geometry hands off.
+        mid_dens = float(os.environ.get("GRASS_MID_DENSITY", "3.5"))
+        p, y, s = world_grid_scatter(x, z, 95.0, mid_dens, self.hf, scale_mul=0.42, mask=self._grass_mask)
         self._grass.update_instances(p, y, s)
         self._near.update(x, z, radius=56.0)   # near meshes follow the camera (cover the LOD band)
+        if self._clumps is not None:
+            # real-geometry clumps: dense, short (~0.3m), small radius (they're heavy)
+            dens = float(os.environ.get("CLUMP_DENSITY", "9.0"))
+            smul = float(os.environ.get("CLUMP_SCALE", "0.42"))
+            pc, yc, sc = world_grid_scatter(x, z, self._clump_radius, dens, self.hf,
+                                            scale_mul=smul, mask=self._grass_mask)
+            self._clumps.update_instances(pc, yc, sc)
+            self._clump_count = len(pc)
 
     def _stream_far(self, x, z):
-        p, y, s = world_grid_scatter(x, z, 340.0, 0.09, self.hf, scale_mul=1.5)
+        p, y, s = world_grid_scatter(x, z, self._grass_far_radius, 0.09, self.hf,
+                                     scale_mul=1.5, mask=self._grass_mask)
         self._grass_far.update_instances(p, y, s)
 
 

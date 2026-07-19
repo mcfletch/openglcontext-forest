@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openglcontext-forest-demo"
+version = "0.1.0"
+description = "Walkable near-photorealistic forest demo for OpenGLContext: real-DEM splat terrain with GPU-instanced tree/grass LOD."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE", "ASSET-LICENSES.md"]
+authors = [{ name = "Mike C. Fletcher", email = "vrplumber@gmail.com" }]
+keywords = ["OpenGLContext", "OpenGL", "terrain", "vegetation", "forest", "LOD", "demo", "3D"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: X11 Applications",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics :: 3D Rendering",
+]
+dependencies = [
+    "OpenGLContext",
+    "numpy>=2.0",
+    "pillow",
+    "scipy>=1.9",
+    "PyOpenGL>=4.0.0a1",
+    "glfw>=2.5",
+]
+
+[project.urls]
+Homepage = "http://pyopengl.sourceforge.net/context/"
+
+[project.scripts]
+oglc-forest = "openglcontext_forest_demo.run:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# Bundle the runtime geometry/textures/heightmaps the demo loads. The large source
+# .glb models they were baked from live in ../assets-source and are NOT shipped in
+# the wheel (they are provenance, documented in ASSET-LICENSES.md).
+[tool.setuptools.package-data]
+openglcontext_forest_demo = ["assets/*", "CREDITS.txt", "CREDITS-trees.txt"]

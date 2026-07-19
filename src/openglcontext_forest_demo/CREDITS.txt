@@ -1,0 +1,18 @@
+Forest demo — asset credits
+============================
+
+TREE MODELS — Creative Commons Attribution 4.0 (CC-BY 4.0), attribution required:
+  * "Fir tree" by Georgeous — https://skfb.ly/pA8TG
+  * "Noel_Pine_Tree" by 3D Error 404 — https://skfb.ly/6XHoJ
+  * "Maple trees pack (lowpoly, game ready, LODs)" by LOLIPOP — https://skfb.ly/p9tGx
+  * "Realistic Trees Collection" by Jungle Jim — https://skfb.ly/pDzJR
+  * "Low Poly Forest Tree Pack" by 99.Miles — https://skfb.ly/pJXrH
+  License: http://creativecommons.org/licenses/by/4.0/
+
+GROUND / DETAIL TEXTURES — CC0 (public domain, no attribution required):
+  * ambientCG.com — Grass004, Ground042 (forest floor), Ground068 (dirt),
+    Rock030, Snow006, Bark012. Cached under ~/.cache/openglcontext/cc0.
+
+TERRAIN ELEVATION:
+  * Great Smoky Mountains heightfield derived from the public AWS Terrain Tiles
+    (Terrarium/Mapzen), which aggregate SRTM, USGS 3DEP and other open sources.

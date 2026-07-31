@@ -21,12 +21,12 @@ class Cap(demo.Forest):
 
     def OnInit(self):
         r = super().OnInit()
-        h = self.hf.grid; sc = demo.RES
+        h = self.hf.grid; sc = self.hf.res; extent = self.hf.extent
         gz, gx = np.gradient(h.astype('f')); slope = np.hypot(gx, gz)
         hi = (h > np.percentile(h, 68)) & (slope > np.percentile(slope, 60))
         ys, xs = np.where(hi); pick = np.linspace(0, len(xs) - 1, 6).astype(int)
         for k in pick:
-            wx = (xs[k] / (sc - 1) - 0.5) * demo.EXTENT; wz = (ys[k] / (sc - 1) - 0.5) * demo.EXTENT
+            wx = (xs[k] / (sc - 1) - 0.5) * extent; wz = (ys[k] / (sc - 1) - 0.5) * extent
             self._shots.append((wx, wz))
         return r
 

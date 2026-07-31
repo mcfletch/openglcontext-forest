@@ -31,6 +31,7 @@ class Bench(demo.Forest):
             x=-200.0+math.sin(self._walk*0.02)*40; z=300.0-self._walk
             self.platform.setPosition((x, self.hf.height_at(x,z)+self.eye_height, z))
             self._stream_near(x,z); self._stream_far(x,z)   # keep the veg field populated
+            self._stream_impostors(x,z)                     # cull impostors to the view cone
             self.triggerRedraw(1)
         return None
 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "openglcontext-forest-demo"
 version = "0.1.0"
-description = "Walkable near-photorealistic forest demo for OpenGLContext: real-DEM splat terrain with GPU-instanced tree/grass LOD."
+description = "Walkable forest demo for OpenGLContext: real-DEM splat terrain with GPU-instanced tree/grass LOD."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"

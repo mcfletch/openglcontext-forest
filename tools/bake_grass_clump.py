@@ -21,7 +21,7 @@ from OpenGL.GL.shaders import compileProgram, compileShader
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, os.path.join(REPO, "openglcontext"))
-DEFAULT_GLB = os.path.join(REPO, "grass-clumps", "basic-clump.glb")
+DEFAULT_GLB = os.path.join(HERE, "..", "src", "openglcontext_forest_demo", "assets", "basic-clump.glb")
 DEFAULT_OUT = os.path.join(HERE, "..", "src", "openglcontext_forest_demo", "assets", "grass_clump_imp.png")
 
 

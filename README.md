@@ -5,13 +5,14 @@ A walkable, near-photorealistic forest demo for
 elevation under a runtime multi-layer **splat terrain**, a GPU-instanced forest with
 distance **LOD** (real tree *meshes* near you, baked *impostor* billboards far off),
 two-layer camera-following grass, terrain sun-shadows and canopy shade, and
-first-person **walking** (ground-clamped, blocked by trunks). ~230k trees, comfortably
-above 60 fps.
+**mouse-look walking** with gravity (ground-clamped, blocked by trunks). ~230k trees,
+comfortably above 60 fps.
 
-The generic rendering engine lives in OpenGLContext
-(`OpenGLContext.scenegraph.terrain`, `OpenGLContext.scenegraph.vegetation`,
-`OpenGLContext.move.terrainwalk`). This package is just the **scene**: the biome mix
-and the concrete geometry/textures/heightmaps.
+The generic engine lives in OpenGLContext — `OpenGLContext.scenegraph.terrain` and
+`.vegetation` for the world, `OpenGLContext.move.terrainwalk` for the avatar that
+walks it, and `OpenGLContext.ui` for the menu, settings and key-binding screens. This
+package is just the **scene**: the biome mix and the concrete
+geometry/textures/heightmaps.
 
 ## Run it
 
@@ -31,7 +32,30 @@ oglc-forest
 
 First launch fetches CC0 ground textures from ambientCG (cached afterwards).
 
-**Controls:** W/A/S/D move, mouse-look; arrows / PageUp-Down also navigate.
+## Controls
+
+You start in **mouse-look**: the pointer steers and the forest is walked, not flown.
+
+| | |
+|---|---|
+| mouse | look around |
+| `w` `a` `s` `d`, arrows | move (`a`/`d` strafe) |
+| `shift` (held) | run |
+| `space` | jump; rise, while flying |
+| `c` | sink, while flying |
+| `m` | cycle the way you move: mouse-look, walk (`q`/`e` turn), fly |
+| `f` | fly (noclip) on/off |
+| `g` | hand the camera to the free-fly navigator, and back |
+| `escape` | the menu: Resume, Controls, Settings, Asset credits, Quit |
+| `F6` / `F10` | the key bindings / the rendering settings |
+| `F2` | save a screenshot into the working directory |
+| `alt` + `f` | the developer overlay |
+
+The keys are not fixed here: each way of moving is a declared `MovementMode` node
+carrying its own speeds and bindings, so the `F6` page can rebind them and they are
+saved for next time. `F10` edits the rendering the same way — shadows, environment
+lighting, anti-aliasing — without a restart. Both are OpenGLContext's own overlay
+screens, so this demo, `oglc-view` and `twitch` are driven the same way.
 
 ## Licensing
 
@@ -49,7 +73,10 @@ forest-demo/
   ASSET-LICENSES.md         # every asset + license + provenance
   assets-source/            # downloaded source .glb models (provenance, not packaged)
   src/openglcontext_forest_demo/
-    run.py                  # the scene + main()
+    config.py               # every user-facing knob, and the command line
+    scene.py                # build_forest_scene(): the reusable world
+    run.py                  # the navigation, the screens and main()
+    menu.py                 # the menu Escape raises
     assets/                 # baked runtime geometry/textures/heightmaps (packaged)
   tools/                    # bench.py, capture.py, bake_assets.py (dev tools)
 ```

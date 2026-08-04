@@ -2,7 +2,7 @@
 """Benchmark the forest demo: render N frames offscreen and report fps.
     /workspaces/OpenGL-dev/.venv/bin/python /workspaces/OpenGL-dev/forest-demo/bench.py
 """
-import os, time
+import os, sys, time
 os.environ.setdefault("OPENGLCONTEXT_BACKEND","glfw")
 os.environ["OPENGLCONTEXT_DISABLE_FPS_DISPLAY"]="1"
 from openglcontext_forest_demo import run as demo   # needs `pip install -e .`
@@ -22,6 +22,7 @@ class Bench(demo.Forest):
             print("frames timed: %d"%len(warm))
             print("median frame: %.1f ms  -> %.1f fps"%(np.median(ms), 1000.0/np.median(ms)))
             print("p95 frame:    %.1f ms  -> %.1f fps"%(np.percentile(ms,95), 1000.0/np.percentile(ms,95)))
+            sys.stdout.flush()   # os._exit skips the buffers: piped, the numbers vanish
             os._exit(0)
         return r
     def OnIdle(self,*a):

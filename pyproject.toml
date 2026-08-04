@@ -44,4 +44,4 @@ where = ["src"]
 # .glb models they were baked from live in ../assets-source and are NOT shipped in
 # the wheel (they are provenance, documented in ASSET-LICENSES.md).
 [tool.setuptools.package-data]
-openglcontext_forest_demo = ["assets/*", "CREDITS.txt", "CREDITS-trees.txt"]
+openglcontext_forest_demo = ["assets/*", "CREDITS.txt"]

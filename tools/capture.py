@@ -4,7 +4,7 @@
 Writes shots/shot_*.png near fir (high/steep) clusters to check foliage/trunk bleed
 and the distant-grass fill.
 """
-import os, math
+import os, sys, math
 os.environ.setdefault("OPENGLCONTEXT_BACKEND", "glfw")
 os.environ["OPENGLCONTEXT_DISABLE_FPS_DISPLAY"] = "1"
 import numpy as np
@@ -61,6 +61,7 @@ class Cap(demo.Forest):
         p = os.path.join(OUT, "shot_%d.png" % self._i); img.save(p); print("wrote", p)
         self._i += 1
         if self._i >= len(self._shots):
+            sys.stdout.flush()   # os._exit skips the buffers
             os._exit(0)
         return r
 

@@ -1,6 +1,6 @@
 # openglcontext-forest-demo
 
-A walkable, near-photorealistic forest demo for
+A walkable, forest demo for
 [OpenGLContext](http://pyopengl.sourceforge.net/context/): real Great-Smoky-Mountains
 elevation under a runtime multi-layer **splat terrain**, a GPU-instanced forest with
 distance **LOD** (real tree *meshes* near you, baked *impostor* billboards far off),

@@ -23,7 +23,6 @@ dependencies = [
     "OpenGLContext",
     "numpy>=2.0",
     "pillow",
-    "scipy>=1.9",
     "PyOpenGL>=4.0.0a1",
     "glfw>=2.5",
 ]

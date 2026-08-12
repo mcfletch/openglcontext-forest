@@ -5,7 +5,10 @@
 windows, and :class:`AutoQuality` only ever steps down (so the 60 fps target
 sitting between medium and high cannot make it oscillate).
 """
+import types
+
 from openglcontext_forest_demo import quality as q
+from openglcontext_forest_demo import scene as sc
 from openglcontext_forest_demo.config import ForestConfig
 
 
@@ -88,21 +91,25 @@ class _Node:
         self._gl = 1 if gl else None
         self.committed = 0
         self.fade_start = self.fade_end = self.near_cut = self.far_fade = None
+        self.cut_start = self.cut_end = None
 
     def _commit_constants(self):
         self.committed += 1
 
 
 class _Scene:
-    def __init__(self, with_clumps=True):
+    def __init__(self):
         self.config = ForestConfig()
-        self.clumps = _Node() if with_clumps else None
         self.grass = _Node()
         self.grass_far = _Node()
         self.clump_radius = self.grass_far_radius = self.near_mesh_radius = 0.0
+        self.retuned = 0
+
+    def retune_clumps(self):
+        self.retuned += 1
 
 
-def test_apply_to_scene_sets_live_knobs_and_recommits():
+def test_apply_to_scene_sets_live_knobs_and_retunes():
     s = _Scene()
     p = q.PRESETS["low"]
     q.apply_to_scene(s, p)
@@ -112,24 +119,38 @@ def test_apply_to_scene_sets_live_knobs_and_recommits():
     assert s.clump_radius == p.clump_radius
     assert s.grass_far_radius == p.grass_far_radius
     assert s.near_mesh_radius == p.near_mesh_radius
-    assert s.clumps.fade_end == p.clump_radius
-    assert s.clumps.fade_start == p.clump_radius * 0.8
+    assert s.retuned == 1                       # clump LOD windows follow clump_radius
     assert s.grass.near_cut == p.clump_radius
     assert s.grass_far.far_fade == p.grass_far_radius
-    assert s.clumps.committed == s.grass.committed == s.grass_far.committed == 1
+    assert s.grass.committed == s.grass_far.committed == 1
 
 
-def test_apply_to_scene_skips_commit_before_gl_init():
+def test_apply_to_scene_skips_grass_commit_before_gl_init():
     s = _Scene()
-    for node in (s.clumps, s.grass, s.grass_far):
+    for node in (s.grass, s.grass_far):
         node._gl = None
-    p = q.PRESETS["medium"]
-    q.apply_to_scene(s, p)
-    assert s.clumps.committed == 0
-    assert s.clumps.fade_end == p.clump_radius   # value still set for first render
+    q.apply_to_scene(s, q.PRESETS["medium"])
+    assert s.grass.committed == 0
+    assert s.grass.near_cut == q.PRESETS["medium"].clump_radius   # value still set
 
 
-def test_apply_to_scene_tolerates_absent_clumps():
-    s = _Scene(with_clumps=False)
-    q.apply_to_scene(s, q.PRESETS["low"])         # must not raise
+def test_retune_clumps_sets_near_and_far_lod_windows():
+    near, far = _Node(), _Node()
+    ns = types.SimpleNamespace(clumps_near=near, clumps_far=far, clump_radius=30.0)
+    sc.ForestScene.retune_clumps(ns)
+    r1 = 30.0 * sc.CLUMP_LOD_FRAC
+    assert near.fade_end == r1 and near.fade_start == r1 * sc.CLUMP_FADE_FRAC
+    assert far.cut_end == r1 and far.cut_start == r1 * sc.CLUMP_FADE_FRAC   # dithers IN at R1
+    assert far.fade_end == 30.0 and far.fade_start == 30.0 * sc.CLUMP_FADE_FRAC
+    assert near.committed == far.committed == 1
+
+
+def test_retune_clumps_is_a_noop_without_clumps():
+    sc.ForestScene.retune_clumps(types.SimpleNamespace(clumps_near=None, clump_radius=30.0))
+
+
+def test_apply_to_scene_delegates_clump_windows_to_the_scene():
+    s = _Scene()
+    q.apply_to_scene(s, q.PRESETS["low"])         # must not touch clump nodes directly
+    assert s.retuned == 1
     assert s.grass.near_cut == q.PRESETS["low"].clump_radius

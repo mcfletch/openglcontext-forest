@@ -72,6 +72,12 @@ preset down until the forest holds ~60 fps, so an integrated GPU lands on `mediu
 and a discrete one stays at `high`; shadows stay on. `F8` cycles the preset by hand
 at any time, which both picks a level and shows what each one costs.
 
+The real-geometry grass clumps carry a distance LOD: full-detail blades close to the
+camera, a coarser-mesh set from ~45% of the clump radius out to its edge, cross-fading
+at the boundary. Most of the disc area is in the far band, so the coarse set carries
+most of the clumps at a fraction of the per-clump vertex cost — the `high` look at close
+to the `medium` frame time. `--clump-far-length-samples` tunes the far detail.
+
 The camera-following grass and impostors re-scatter as you move. That scatter runs
 on a background thread and the render loop only uploads the finished arrays, so
 crossing a streaming boundary no longer lands its work on a single frame.

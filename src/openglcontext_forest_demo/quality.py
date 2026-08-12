@@ -84,10 +84,8 @@ def apply_to_scene(scene, preset: QualityPreset) -> None:
         if node is not None and getattr(node, "_gl", None) is not None:
             node._commit_constants()
 
-    if scene.clumps is not None:
-        scene.clumps.fade_start = preset.clump_radius * 0.8
-        scene.clumps.fade_end = preset.clump_radius
-        recommit(scene.clumps)
+    # clump LOD fade/cut windows (both nodes) follow clump_radius
+    scene.retune_clumps()
     # mid grass billboards fade IN exactly where the clumps fade out
     scene.grass.near_cut = preset.clump_radius
     recommit(scene.grass)

@@ -42,7 +42,8 @@ class ForestConfig:
     grass_mid_density: float = 3.5    # mid grass billboards per m^2
     clump_density: float = 9.0        # real grass clumps per m^2
     clump_scale: float = 0.42         # grass-clump scale multiplier
-    clump_length_samples: int = 4     # blade-length subdivisions baked per clump
+    clump_length_samples: int = 4     # blade-length subdivisions baked per near clump
+    clump_far_length_samples: int = 1  # coarse blade subdivisions for the distance-LOD far clumps
     grass_sun: float = 0.36           # flat sun term for grass billboards (matches clumps)
     grass_mid_scale: float = 0.42     # mid grass billboard scale multiplier
     grass_far_density: float = 0.09   # far grass billboards per m^2
@@ -115,7 +116,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     g.add_argument("--clump-scale", dest="clump_scale", type=float, default=d.clump_scale,
                    help="grass-clump scale multiplier")
     g.add_argument("--clump-length-samples", dest="clump_length_samples", type=int,
-                   default=d.clump_length_samples, help="blade-length subdivisions baked per clump")
+                   default=d.clump_length_samples, help="blade-length subdivisions baked per near clump")
+    g.add_argument("--clump-far-length-samples", dest="clump_far_length_samples", type=int,
+                   default=d.clump_far_length_samples,
+                   help="coarse blade subdivisions for the distance-LOD far clumps")
     g.add_argument("--grass-sun", dest="grass_sun", type=float, default=d.grass_sun,
                    help="flat sun term for grass billboards (matches the clump geometry)")
     g.add_argument("--grass-mid-scale", dest="grass_mid_scale", type=float, default=d.grass_mid_scale,

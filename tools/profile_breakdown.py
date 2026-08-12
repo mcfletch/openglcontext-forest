@@ -30,7 +30,7 @@ class PB(demo.Forest):
         if "grass" in DISABLE:
             kill(sc.grass); kill(sc.grass_far)
         if "clumps" in DISABLE:
-            kill(sc.clumps)
+            kill(sc.clumps_near); kill(sc.clumps_far)
         if "impostors" in DISABLE:
             for node, *_ in sc.impostors:
                 kill(node)

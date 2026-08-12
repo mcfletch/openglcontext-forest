@@ -60,6 +60,12 @@ class ForestConfig:
     # --- spawn ---
     seed: int = 1             # RNG seed for the walkable spawn-point search
 
+    # --- render quality ---
+    # 'auto' measures the live frame rate and picks high/medium/low to hold ~60 fps
+    # (integrated GPUs land on medium); high/medium/low freeze that choice so the
+    # cost of each level is visible. The shipped defaults above ARE the 'high' look.
+    quality: str = "auto"
+
 
 def build_arg_parser() -> argparse.ArgumentParser:
     """Build the demo's command-line parser; every flag defaults to a `ForestConfig` field.
@@ -133,6 +139,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     c.add_argument("--far", type=float, default=d.far, help="far clip plane (m)")
 
     p.add_argument("--seed", type=int, default=d.seed, help="RNG seed for the spawn-point search")
+
+    p.add_argument("--quality", choices=["auto", "high", "medium", "low"], default=d.quality,
+                   help="render quality: auto measures fps to hold ~60; high/medium/low freeze it")
     return p
 
 

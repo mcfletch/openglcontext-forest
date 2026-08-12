@@ -109,44 +109,82 @@ class ForestScene:
     spawn: tuple                     # (ex, ez) walkable spawn point
 
     # --- reusable camera-following streamers (register on the move loop) ---
+    # Each field splits into a pure ``compute_*`` (the numpy scatter/cull — GL-free,
+    # so an AsyncStreamer can run it off the render thread) and an ``apply_*`` (the
+    # cheap ``update_instances`` staging, which must run on the GL thread). The
+    # ``stream_*`` wrappers do both in line, for the first fill and for a live
+    # quality change where the restream should show at once.
+
+    def compute_near(self, x, z):
+        """Scatter the near field at ``(x, z)``: mid grass, near tree meshes, real clumps.
+
+        Mid grass billboards are short like the clumps and dense enough to overlap
+        into continuous cover, so the geometry->billboard band doesn't read as
+        sparse tufts. Clumps are dense, short and small-radius because they are the
+        heaviest layer. Returns ``(mid, near_pending, clump)`` for :meth:`apply_near`."""
+        cfg = self.config
+        mid = world_grid_scatter(x, z, MID_GRASS_FADE, cfg.grass_mid_density, self.hf,
+                                 scale_mul=cfg.grass_mid_scale, mask=self.grass_mask)
+        near_pending = self.near.compute_pending(x, z, radius=self.near_mesh_radius)
+        clump = None
+        if self.clumps is not None:
+            clump = world_grid_scatter(x, z, self.clump_radius, cfg.clump_density, self.hf,
+                                       scale_mul=cfg.clump_scale, mask=self.grass_mask)
+        return mid, near_pending, clump
+
+    def apply_near(self, payload):
+        """Stage a :meth:`compute_near` result on the GL thread."""
+        mid, near_pending, clump = payload
+        self.grass.update_instances(*mid)
+        self.near._pending = near_pending      # uploaded by the node's next render
+        if clump is not None and self.clumps is not None:
+            self.clumps.update_instances(*clump)
 
     def stream_near(self, x, z):
-        """Restream the near-field: mid grass billboards, near tree meshes, real clumps."""
-        cfg = self.config
-        # mid grass billboards: short like the clumps, dense enough to overlap into
-        # continuous cover so the geometry->billboard band doesn't read as sparse tufts.
-        p, y, s = world_grid_scatter(x, z, MID_GRASS_FADE, cfg.grass_mid_density, self.hf,
-                                     scale_mul=cfg.grass_mid_scale, mask=self.grass_mask)
-        self.grass.update_instances(p, y, s)
-        self.near.update(x, z, radius=self.near_mesh_radius)   # near meshes cover the LOD band
-        if self.clumps is not None:
-            # real-geometry clumps: dense, short, small radius (they are heavy)
-            pc, yc, sc = world_grid_scatter(x, z, self.clump_radius, cfg.clump_density, self.hf,
-                                            scale_mul=cfg.clump_scale, mask=self.grass_mask)
-            self.clumps.update_instances(pc, yc, sc)
+        """Restream the near field synchronously (first fill / quality change)."""
+        self.apply_near(self.compute_near(x, z))
+
+    def compute_far(self, x, z):
+        """Scatter the coarse far-grass disc that follows the camera to the horizon."""
+        return world_grid_scatter(x, z, self.grass_far_radius, self.config.grass_far_density,
+                                  self.hf, scale_mul=FAR_GRASS_SCALE_MUL, mask=self.grass_mask)
+
+    def apply_far(self, payload):
+        """Stage a :meth:`compute_far` result on the GL thread."""
+        self.grass_far.update_instances(*payload)
 
     def stream_far(self, x, z):
-        """Restream the coarse far-grass disc that follows the camera out to the horizon."""
-        p, y, s = world_grid_scatter(x, z, self.grass_far_radius, self.config.grass_far_density,
-                                     self.hf, scale_mul=FAR_GRASS_SCALE_MUL, mask=self.grass_mask)
-        self.grass_far.update_instances(p, y, s)
+        """Restream the far-grass disc synchronously."""
+        self.apply_far(self.compute_far(x, z))
 
-    def stream_impostors(self, x, z, fx, fz):
-        """Submit only the impostor cards inside the forward view cone `(fx, fz)`.
+    def compute_impostors(self, x, z, fx, fz):
+        """The impostor cards inside the forward view cone `(fx, fz)`, per species.
 
         A forward cone (dot > 0, dot^2 > cos^2 * dist^2 tests the angle without a
         per-tree sqrt) plus a small always-drawn near disc. Trees behind and beside
         the camera — roughly half the forest — never reach the GPU. Callers pass the
         camera's ground-plane forward vector so this stays independent of any one
-        navigation scheme."""
+        navigation scheme. Returns ``[(node, pos, yaw, scale), …]`` for
+        :meth:`apply_impostors`."""
         cc = self.impostor_cos * self.impostor_cos
         near2 = IMPOSTOR_NEAR_DISC * IMPOSTOR_NEAR_DISC
+        out = []
         for node, P, Y, S in self.impostors:
             dx = P[:, 0] - x; dz = P[:, 2] - z
             d2 = dx * dx + dz * dz
             dot = dx * fx + dz * fz
             keep = (d2 < near2) | ((dot > 0.0) & (dot * dot > cc * d2))
-            node.update_instances(P[keep], Y[keep], S[keep])
+            out.append((node, P[keep], Y[keep], S[keep]))
+        return out
+
+    def apply_impostors(self, payload):
+        """Stage a :meth:`compute_impostors` result on the GL thread."""
+        for node, p, y, s in payload:
+            node.update_instances(p, y, s)
+
+    def stream_impostors(self, x, z, fx, fz):
+        """Cull and submit the impostor cards synchronously."""
+        self.apply_impostors(self.compute_impostors(x, z, fx, fz))
 
 
 def build_forest_scene(config: ForestConfig) -> ForestScene:

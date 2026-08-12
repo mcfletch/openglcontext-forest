@@ -13,6 +13,7 @@ Controls:
 - ``f`` flies
 - ``g`` hands the camera to the free-fly navigator and back
 - ``F6`` shows the keys and lets them be rebound
+- ``F8`` cycles the render-quality preset (low / medium / high)
 - ``F10`` the rendering settings
 - ``F2`` saves a screenshot
 - ``Alt+F`` the developer overlay
@@ -51,7 +52,7 @@ screen and the launch notice both show):
 - "Low Poly Forest Tree Pack" by 99.Miles.
 """
 import logging
-import os, sys, math
+import os, sys, math, time
 import pathlib
 from typing import Any, List, Optional
 
@@ -68,8 +69,10 @@ from OpenGLContext.viewer.overlay import ScreenshotMixin
 BaseContext = testingcontext.getInteractive()
 
 from openglcontext_forest_demo import menu
+from openglcontext_forest_demo import quality as qual
 from openglcontext_forest_demo.config import ForestConfig, config_from_args
 from openglcontext_forest_demo.scene import build_forest_scene
+from openglcontext_forest_demo.streaming import AsyncStreamer
 
 log = logging.getLogger(__name__)
 
@@ -88,6 +91,7 @@ FLY_SPEED = 30.0
 #: binding for one is accepted and then never fires.
 SCREEN_KEYS = (
     ('<F6>', 'showBindings'),
+    ('<F8>', 'cycleQuality'),
     ('<F10>', 'showSettings'),
     ('m', 'cycleMovementMode'),
 )
@@ -155,10 +159,94 @@ class Forest(OverlayMixin, ScreenshotMixin, TerrainWalkMixin, BaseContext):
         self.bindScreenKeys()
         # Register the SAME reusable streamers a driving demo would; impostor
         # culling needs the camera forward vector, which this navigation supplies.
-        self.add_stream(10.0, scene.stream_near)
-        self.add_stream(40.0, scene.stream_far)
-        self.add_stream(20.0, self._stream_impostors, turn=math.radians(9.0))
+        # Off-thread stream recompute: the scatter is pure numpy (GIL-released while
+        # it runs) and latency-tolerant — a field trailing the camera a frame or two
+        # is hidden by the LOD fade bands — so it runs on worker threads and the
+        # render loop only drains the finished arrays (see OnDraw). This is what
+        # keeps a step-across-a-threshold from landing a ~50 ms scatter on one frame.
+        self._near_stream = AsyncStreamer(scene.compute_near, scene.apply_near, "stream-near")
+        self._far_stream = AsyncStreamer(scene.compute_far, scene.apply_far, "stream-far")
+        self._imp_stream = AsyncStreamer(scene.compute_impostors, scene.apply_impostors, "stream-imp")
+        self._streamers = (self._near_stream, self._far_stream, self._imp_stream)
+        self.add_stream(10.0, lambda x, z: self._near_stream.request(x, z))
+        self.add_stream(40.0, lambda x, z: self._far_stream.request(x, z))
+        self.add_stream(20.0, self._request_impostors, turn=math.radians(9.0))
+
+        # --- render quality (Tier 1: hold ~60 fps on integrated GPUs) ---
+        # The presets are demo scatter knobs (clump/grass density + radii, near-mesh
+        # radius) the scene already reads each frame, so a change applies live with
+        # no rebuild.  'auto' starts at high and lets OnDraw's frame-rate measure
+        # step it down to what the GPU holds; high/medium/low freeze the choice.
+        # F8 cycles it by hand.
+        self._quality = 'medium'
+        self._auto = None
+        self._frame_t = None
+        mode = (getattr(cfg, 'quality', 'auto') or 'auto').lower()
+        if mode == 'auto':
+            self._auto = qual.AutoQuality(target_fps=60.0, start='high')
+            self._apply_quality('high', announce=False)
+        else:
+            self._apply_quality(mode, announce=False)
+        print("quality: %s%s  (F8 cycles low/medium/high)" % (
+            mode, " — measuring" if self._auto is not None else ""))
+
         print_controls()
+
+    # -- render quality ---------------------------------------------------
+    def _apply_quality(self, level, announce=True):
+        """Point the live scene at preset ``level`` and restream so it shows at once."""
+        self._quality = level
+        qual.apply_to_scene(self.scene, qual.PRESETS[level])
+        try:
+            x, z = self._tw_xz()
+        except Exception:
+            x, z = self.scene.spawn
+        try:
+            self._stream_near(x, z); self._stream_far(x, z); self._stream_impostors(x, z)
+        except Exception:
+            pass   # before the walk/nav is live the first OnIdle will stream instead
+        self.triggerRedraw(1)
+        if announce:
+            print("quality -> %s" % level); sys.stdout.flush()
+
+    def cycleQuality(self, event=None):
+        """F8: step low -> medium -> high -> low.  A manual pick freezes auto."""
+        self._auto = None
+        self._apply_quality(qual.next_level_cycle(self._quality))
+        return None
+
+    def _request_impostors(self, x, z):
+        """Ask the impostor worker to re-cull to the current forward view cone."""
+        fx, fz = self._tw_forward()
+        self._imp_stream.request(x, z, fx, fz)
+
+    def OnDraw(self, *a, **k):
+        """Render, and while auto-quality is measuring, time frames and adapt."""
+        # Hand any finished off-thread stream result to its node before drawing, so
+        # the fresh instances upload in this frame's render.
+        for streamer in self._streamers:
+            streamer.drain()
+        r = super(Forest, self).OnDraw(*a, **k)
+        if self._auto is not None:
+            now = time.perf_counter()
+            if self._frame_t is not None:
+                was_decided = self._auto.decided
+                new = self._auto.add_frame((now - self._frame_t) * 1000.0)
+                if new is not None and new != self._quality:
+                    self._apply_quality(new, announce=False)
+                    print("quality: auto measured %.1f ms -> %s" % (
+                        self._auto.last_median, new)); sys.stdout.flush()
+                    self._auto.note_applied(new)
+                elif self._auto.decided and not was_decided:
+                    m = self._auto.last_median
+                    print("quality: auto settled on %s (%.1f ms, %.0f fps)" % (
+                        self._quality, m, 1000.0 / m if m else 0.0)); sys.stdout.flush()
+            self._frame_t = now
+            # Force frames only until the first decision; afterwards let natural
+            # redraws feed the picker so it can still drop a rung in dense forest.
+            if not self._auto.decided:
+                self.triggerRedraw(1)
+        return r
 
     # -- the screens ------------------------------------------------------
     def bindScreenKeys(self, context: Any = None) -> None:
@@ -298,8 +386,8 @@ def print_controls():
     sys.stdout.write(
         "  mouse steers, w a s d move, shift runs, space jumps\n"
         "  m cycles walk / fly / mouse-look, f flies, g free-fly camera\n"
-        "  F6 keys, F10 rendering settings, F2 screenshot, alt+f developer "
-        "overlay, escape menu\n")
+        "  F6 keys, F8 quality (low/medium/high), F10 rendering settings, F2 "
+        "screenshot, alt+f developer overlay, escape menu\n")
     sys.stdout.flush()
 
 

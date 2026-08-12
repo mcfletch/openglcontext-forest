@@ -40,6 +40,7 @@ def test_defaults_match_documented_values():
         impostor_cone_deg=75.0, near_mesh_radius=56.0,
         fov_deg=62.0, eye_height=1.7, near=0.25, far=9000.0,
         seed=1,
+        quality="auto",
     )
     got = {f.name: getattr(c, f.name) for f in dataclasses.fields(c)}
     assert got == expected

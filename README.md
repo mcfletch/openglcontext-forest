@@ -48,6 +48,7 @@ You start in **mouse-look**: the pointer steers and the forest is walked, not fl
 | `g` | hand the camera to the free-fly navigator, and back |
 | `escape` | the menu: Resume, Controls, Settings, Asset credits, Quit |
 | `F6` / `F10` | the key bindings / the rendering settings |
+| `F8` | cycle the render-quality preset (low / medium / high) |
 | `F2` | save a screenshot into the working directory |
 | `alt` + `f` | the developer overlay |
 
@@ -56,6 +57,24 @@ carrying its own speeds and bindings, so the `F6` page can rebind them and they 
 saved for next time. `F10` edits the rendering the same way — shadows, environment
 lighting, anti-aliasing — without a restart. Both are OpenGLContext's own overlay
 screens, so this demo, `oglc-view` and `twitch` are driven the same way.
+
+## Quality and performance
+
+`--quality` chooses how much near-field grass the scene carries — the layer that
+dominates GPU cost — across `high` (the shipped look), `medium` and `low`:
+
+```bash
+oglc-forest --quality medium
+```
+
+The default, `--quality auto`, measures the frame rate at start-up and steps the
+preset down until the forest holds ~60 fps, so an integrated GPU lands on `medium`
+and a discrete one stays at `high`; shadows stay on. `F8` cycles the preset by hand
+at any time, which both picks a level and shows what each one costs.
+
+The camera-following grass and impostors re-scatter as you move. That scatter runs
+on a background thread and the render loop only uploads the finished arrays, so
+crossing a streaming boundary no longer lands its work on a single frame.
 
 ## Licensing
 

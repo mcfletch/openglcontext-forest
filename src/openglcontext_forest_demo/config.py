@@ -144,8 +144,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     p.add_argument("--seed", type=int, default=d.seed, help="RNG seed for the spawn-point search")
 
-    p.add_argument("--quality", choices=["auto", "high", "medium", "low"], default=d.quality,
-                   help="render quality: auto measures fps to hold ~60; high/medium/low freeze it")
+    # Ladder rungs kept in sync with quality.LADDER (imported lazily to avoid a cycle:
+    # quality imports ForestConfig from here).
+    p.add_argument("--quality",
+                   choices=["auto", "high", "medhigh", "medium", "medlow", "low"],
+                   default=d.quality,
+                   help="render quality: auto measures fps to hold ~60; a rung name freezes it")
     return p
 
 

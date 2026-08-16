@@ -28,9 +28,10 @@ Usage (from the demo project root, with the package importable)::
 
 Requires: trimesh (glb parsing), numpy, pillow; glfw + PyOpenGL for --impostors.
 """
+import argparse
 import os
 import sys
-import argparse
+
 import numpy as np
 from PIL import Image
 
@@ -47,20 +48,20 @@ REAL = "realistic_trees_collection.glb"
 # prefixes for each part, and the texture output stems. Node names were resolved by
 # matching the shipped npz vertex counts back to the source geometries.
 SPECIES = [
-    dict(out="fir", glb=FIR, opaque=["Fir01_LOD0_M_Bark.007_0"],
-         foliage=["Fir01_LOD0_M_Branch.007_0"], okey="o", fkey="b",
-         otex="fir_bark", ftex="fir_branch", imp="fir_imp"),
-    dict(out="noel", glb=NOEL, opaque=["noel_pine_tree_trunk_0"],
-         foliage=["noel_pine_tree_leaves_0"], okey="o", fkey="b",
-         otex="noel_bark", ftex="noel_branch", imp="noel_imp"),
+    {"out": "fir", "glb": FIR, "opaque": ["Fir01_LOD0_M_Bark.007_0"],
+         "foliage": ["Fir01_LOD0_M_Branch.007_0"], "okey": "o", "fkey": "b",
+         "otex": "fir_bark", "ftex": "fir_branch", "imp": "fir_imp"},
+    {"out": "noel", "glb": NOEL, "opaque": ["noel_pine_tree_trunk_0"],
+         "foliage": ["noel_pine_tree_leaves_0"], "okey": "o", "fkey": "b",
+         "otex": "noel_bark", "ftex": "noel_branch", "imp": "noel_imp"},
 ]
 _MAPLE = [("maple0", "medium_1"), ("maple1", "medium_2"),
           ("maple2", "small_1"), ("maple3", "large_3")]
 for out, tag in _MAPLE:
-    SPECIES.append(dict(
-        out=out, glb=MAPLE, opaque=["Acer_%s_LOD2_Bark_Mat_0" % tag],
-        foliage=["Acer_%s_LOD2_Cluster_Mat_0" % tag], okey="b", fkey="c",
-        otex="maple_bark", ftex="maple_leaves", imp="maple_imp" + out[-1]))
+    SPECIES.append({
+        "out": out, "glb": MAPLE, "opaque": [f"Acer_{tag}_LOD2_Bark_Mat_0"],
+        "foliage": [f"Acer_{tag}_LOD2_Cluster_Mat_0"], "okey": "b", "fkey": "c",
+        "otex": "maple_bark", "ftex": "maple_leaves", "imp": "maple_imp" + out[-1]})
 _REAL = [
     ("real0", "Tree EZTree0.Large_branches_0", ["Tree EZTree0.Large_leaves_0"]),
     ("real1", "Tree EZTree0.Medium010_branches.010_0", ["Tree EZTree0.Medium010_leaves.010_0"]),
@@ -72,8 +73,8 @@ _REAL = [
     ("real6", "Tree EZTree1.Medium002_branches.002_0", ["Tree EZTree1.Medium002_leaves.002_0"]),
 ]
 for i, (out, br, lf) in enumerate(_REAL):
-    SPECIES.append(dict(out=out, glb=REAL, opaque=[br], foliage=lf, okey="o", fkey="b",
-                        otex="real_br%d" % i, ftex="real_lf%d" % i, imp="imp%d" % i))
+    SPECIES.append({"out": out, "glb": REAL, "opaque": [br], "foliage": lf, "okey": "o", "fkey": "b",
+                        "otex": f"real_br{i}", "ftex": f"real_lf{i}", "imp": f"imp{i}"})
 
 
 def _world_part(scene, names):
@@ -98,7 +99,7 @@ def _texture(scene, name, path):
     mat = getattr(g.visual, "material", None)
     img = getattr(mat, "baseColorTexture", None) or getattr(mat, "image", None)
     if img is None:
-        raise RuntimeError("no base-colour texture on %s" % name)
+        raise RuntimeError(f"no base-colour texture on {name}")
     img.convert("RGBA").save(path)
 
 
@@ -123,30 +124,77 @@ def bake_geometry(scene, spec, out_dir):
     np.savez(os.path.join(out_dir, spec["out"] + ".npz"), **data)
     _texture(scene, spec["opaque"][0], os.path.join(out_dir, spec["otex"] + ".png"))
     _texture(scene, spec["foliage"][0], os.path.join(out_dir, spec["ftex"] + ".png"))
-    return dict(verts=len(oP) + len(fP), h=h)
+    return {"verts": len(oP) + len(fP), "h": h}
 
 
 def bake_impostor(scene, spec, out_dir, size=512):
     """Render a front-on orthographic RGBA billboard of the tree to <impostor>.png."""
-    import glfw
-    from OpenGL.GL import (
-        glGenFramebuffers, glBindFramebuffer, GL_FRAMEBUFFER, glGenTextures,
-        glBindTexture, GL_TEXTURE_2D, glTexImage2D, GL_RGBA, GL_RGBA8,
-        GL_UNSIGNED_BYTE, glFramebufferTexture2D, GL_COLOR_ATTACHMENT0,
-        glGenRenderbuffers, glBindRenderbuffer, GL_RENDERBUFFER, glRenderbufferStorage,
-        GL_DEPTH_COMPONENT24, glFramebufferRenderbuffer, GL_DEPTH_ATTACHMENT,
-        glViewport, glClearColor, glClear, GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT,
-        glEnable, GL_DEPTH_TEST, glTexParameteri, GL_TEXTURE_MIN_FILTER, GL_LINEAR,
-        GL_TEXTURE_MAG_FILTER, glReadPixels, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE,
-        GL_TEXTURE_WRAP_T, glGenerateMipmap, glUseProgram, glGetUniformLocation,
-        glUniformMatrix4fv, glUniform1i, GL_FALSE, glActiveTexture, GL_TEXTURE0,
-        glGenVertexArrays, glBindVertexArray, glGenBuffers, glBindBuffer,
-        GL_ARRAY_BUFFER, glBufferData, GL_STATIC_DRAW, glVertexAttribPointer, GL_FLOAT,
-        glEnableVertexAttribArray, GL_ELEMENT_ARRAY_BUFFER, glDrawElements, GL_TRIANGLES,
-        GL_UNSIGNED_INT, glDisable, GL_BLEND, GL_TRUE)
-    from OpenGL.GL.shaders import compileProgram, compileShader
-    from OpenGL.GL import GL_VERTEX_SHADER, GL_FRAGMENT_SHADER
     import ctypes
+
+    from OpenGL.GL import (
+        GL_ARRAY_BUFFER,
+        GL_BLEND,
+        GL_CLAMP_TO_EDGE,
+        GL_COLOR_ATTACHMENT0,
+        GL_COLOR_BUFFER_BIT,
+        GL_DEPTH_ATTACHMENT,
+        GL_DEPTH_BUFFER_BIT,
+        GL_DEPTH_COMPONENT24,
+        GL_DEPTH_TEST,
+        GL_ELEMENT_ARRAY_BUFFER,
+        GL_FALSE,
+        GL_FLOAT,
+        GL_FRAGMENT_SHADER,
+        GL_FRAMEBUFFER,
+        GL_LINEAR,
+        GL_RENDERBUFFER,
+        GL_RGBA,
+        GL_RGBA8,
+        GL_STATIC_DRAW,
+        GL_TEXTURE0,
+        GL_TEXTURE_2D,
+        GL_TEXTURE_MAG_FILTER,
+        GL_TEXTURE_MIN_FILTER,
+        GL_TEXTURE_WRAP_S,
+        GL_TEXTURE_WRAP_T,
+        GL_TRIANGLES,
+        GL_TRUE,
+        GL_UNSIGNED_BYTE,
+        GL_UNSIGNED_INT,
+        GL_VERTEX_SHADER,
+        glActiveTexture,
+        glBindBuffer,
+        glBindFramebuffer,
+        glBindRenderbuffer,
+        glBindTexture,
+        glBindVertexArray,
+        glBufferData,
+        glClear,
+        glClearColor,
+        glDisable,
+        glDrawElements,
+        glEnable,
+        glEnableVertexAttribArray,
+        glFramebufferRenderbuffer,
+        glFramebufferTexture2D,
+        glGenBuffers,
+        glGenerateMipmap,
+        glGenFramebuffers,
+        glGenRenderbuffers,
+        glGenTextures,
+        glGenVertexArrays,
+        glGetUniformLocation,
+        glReadPixels,
+        glRenderbufferStorage,
+        glTexImage2D,
+        glTexParameteri,
+        glUniform1i,
+        glUniformMatrix4fv,
+        glUseProgram,
+        glVertexAttribPointer,
+        glViewport,
+    )
+    from OpenGL.GL.shaders import compileProgram, compileShader
 
     d = np.load(os.path.join(out_dir, spec["out"] + ".npz"))
     ok, fk = spec["okey"], spec["fkey"]
@@ -233,11 +281,11 @@ def main(argv=None):
         if spec["glb"] not in scenes:
             scenes[spec["glb"]] = trimesh.load(os.path.join(args.source, spec["glb"]))
         m = bake_geometry(scenes[spec["glb"]], spec, args.out)
-        msg = "  %-8s verts=%-7d" % (spec["out"], m["verts"])
+        msg = f"  {spec['out']:<8} verts={m['verts']:<7}"
         if not args.no_impostors:
             bake_impostor(scenes[spec["glb"]], spec, args.out); msg += " +impostor"
         print(msg); sys.stdout.flush()
-    print("baked %d species -> %s" % (len(specs), args.out))
+    print(f"baked {len(specs)} species -> {args.out}")
 
 
 if __name__ == "__main__":

@@ -14,10 +14,12 @@ Presets:
 - ``medium`` — tuned to ~60 fps on a UHD-630-class iGPU.
 - ``low``    — extra headroom for the weakest parts.
 
-``auto`` is not a preset but a mode: :class:`AutoQuality` measures the live frame
-rate and steps between the presets until the rate is at target, keeping shadows on
-(they cost <1 ms here — not worth dropping). A user who picks high/medium/low
-explicitly overrides and freezes the auto picker so they can see each level's cost.
+``auto`` is not a preset but a mode: :class:`AutoQuality` measures the frame rate
+once at ``high`` and picks the level that should hold the target, keeping shadows on
+(they cost <1 ms here — not worth dropping). A capable GPU holds ``high`` and nothing
+changes; a slower one has its pick applied deferred (folded into the next streaming
+move) so the field is never seen re-scattering in place. A user who picks
+high/medium/low explicitly freezes that choice.
 """
 from __future__ import annotations
 
@@ -36,29 +38,53 @@ class QualityPreset:
     grass_far_radius: float    # coarse far-grass follow-disc radius, metres
     grass_far_density: float   # far grass billboards per m^2
     near_mesh_radius: float    # radius the near-mesh trees follow the camera, metres
+    #: GPU cost of this preset relative to ``high`` (=1.0). Used by the auto picker to
+    #: estimate a level's frame time from a measurement taken at another level, so it
+    #: can land on the *highest* level that holds the target rather than over-dropping.
+    #: Calibrated from measured GPU time; recheck if the preset knobs change materially.
+    cost_weight: float
 
 
 _D = ForestConfig()   # shipped defaults define the `high` preset so the two never drift
 
-#: The presets, cheapest first (see :data:`ORDER`).
+#: The quality ladder, cheapest first. `high`/`medium`/`low` are the named rungs a
+#: user picks (F8, ``--quality``); the two intermediate rungs exist only to give the
+#: auto picker somewhere to land between them, so it need not jump a big fidelity step
+#: to hold ~60 fps. Each rung's ``cost_weight`` is its GPU cost relative to `high`,
+#: measured **fullscreen** (fill-bound) -- the regime where the picker actually
+#: downgrades. Windowed the ratios differ (the clump vertex cost is per-primitive, not
+#: per-pixel), but windowed `high` holds, so the weights only matter fill-bound.
 PRESETS = {
     "high": QualityPreset(
         "high", clump_density=_D.clump_density, clump_radius=_D.clump_radius,
         grass_mid_density=_D.grass_mid_density, grass_far_radius=_D.grass_far_radius,
-        grass_far_density=_D.grass_far_density, near_mesh_radius=_D.near_mesh_radius),
+        grass_far_density=_D.grass_far_density, near_mesh_radius=_D.near_mesh_radius,
+        cost_weight=1.0),
+    "medhigh": QualityPreset(
+        "medhigh", clump_density=6.0, clump_radius=24.0, grass_mid_density=3.0,
+        grass_far_radius=540.0, grass_far_density=0.08, near_mesh_radius=53.0,
+        cost_weight=0.78),
     "medium": QualityPreset(
         "medium", clump_density=4.0, clump_radius=18.0, grass_mid_density=2.5,
-        grass_far_radius=400.0, grass_far_density=0.07, near_mesh_radius=50.0),
+        grass_far_radius=400.0, grass_far_density=0.07, near_mesh_radius=50.0,
+        cost_weight=0.67),
+    "medlow": QualityPreset(
+        "medlow", clump_density=3.0, clump_radius=15.0, grass_mid_density=2.0,
+        grass_far_radius=330.0, grass_far_density=0.06, near_mesh_radius=46.0,
+        cost_weight=0.64),
     "low": QualityPreset(
         "low", clump_density=2.0, clump_radius=12.0, grass_mid_density=1.5,
-        grass_far_radius=260.0, grass_far_density=0.05, near_mesh_radius=42.0),
+        grass_far_radius=260.0, grass_far_density=0.05, near_mesh_radius=42.0,
+        cost_weight=0.53),
 }
 
-#: Presets from cheapest to most expensive — the ladder the auto picker walks.
-ORDER = ["low", "medium", "high"]
+#: Every rung, cheapest first — the ladder the auto picker chooses from and F8 cycles.
+LADDER = ["low", "medlow", "medium", "medhigh", "high"]
+#: Backwards-compatible alias (the old three-rung name).
+ORDER = LADDER
 
-#: Valid ``--quality`` values.
-CHOICES = ["auto", "high", "medium", "low"]
+#: Valid ``--quality`` values: auto, or any ladder rung (F8 cycles the same set).
+CHOICES = ["auto", *reversed(LADDER)]
 
 
 def apply_to_scene(scene, preset: QualityPreset) -> None:
@@ -95,21 +121,23 @@ def apply_to_scene(scene, preset: QualityPreset) -> None:
 
 
 class AutoQuality:
-    """Measured-frame-rate quality picker — down-only, so it never oscillates.
+    """Measured-frame-rate quality picker — one measurement, one decision.
 
-    Fed one frame time per rendered frame, it holds a rolling median and steps the
-    preset *down* a rung whenever that median is slower than the target for a whole
-    window. It deliberately never steps *up*: the 60 fps target sits between what
-    two adjacent presets can sustain (e.g. medium clears it easily while high cannot
-    on a UHD 630), so an up-step would just flap medium<->high forever. It starts at
-    ``high`` (the shipped look) and drops only as far as the hardware needs — a
-    discrete GPU holds ``high``, a UHD 630 lands on ``medium``, a weaker part on
-    ``low``; a user who wants a different level picks one by hand (F8). It reports
-    *when* a down-step is wanted; the owner applies it and calls :meth:`note_applied`.
+    It measures a single window at the start level (``high`` at first launch, the
+    shipped look, so a capable GPU is already where it belongs) and picks the level
+    that should hold the target by scaling the measured frame time by each rung's
+    :attr:`~QualityPreset.cost_weight` — landing on the *highest* rung that fits, so a
+    GPU that just misses `high` drops to `medhigh`, not all the way to `low`. It does
+    **not** step level-by-level, because measuring a lower level means *showing* it,
+    and a whole field of grass changing density on screen is the very pop we are
+    avoiding: the one target is applied deferred (folded into the next streaming move)
+    by the owner, then the picker stops. The owner re-runs it on a resolution change
+    (fill scales with pixels), starting from the current level, which is also how it
+    climbs back up when a window shrinks.
 
-    :attr:`decided` flips true only once a window lands in-band (or at the ``low``
-    rail): the owner force-feeds frames until then so start-up converges through each
-    down-step, and lets natural frames drive any later drop in dense forest.
+    :attr:`decided` flips true once the window is judged; :attr:`target` is the level
+    to settle at (None means "keep the start level"). The owner force-feeds frames
+    until decided, applies :attr:`target` deferred, and locks.
     """
 
     def __init__(self, target_fps: float = 60.0, start: str = "high",
@@ -118,7 +146,7 @@ class AutoQuality:
         self.target_fps = target_fps
         self.window = window
         self.warmup = warmup
-        # Step DOWN when the median frame is slower than this. The measurement is a
+        # Over this frame time the start level misses target. The measurement is a
         # static view (the picker force-redraws a still camera), which reads ~30%
         # heavier than the same scene in motion, so the band sits ~12 fps under the
         # target: ~48 fps standing ≈ the 60 fps target while walking.
@@ -126,14 +154,18 @@ class AutoQuality:
         self._samples: list[float] = []
         self._seen = 0
         self.decided = False
-        self.last_median = 0.0   # median frame time (ms) of the most recent full window
+        self.target: str | None = None
+        self.last_median = 0.0   # median frame time (ms) of the measurement window
 
     def add_frame(self, dt_ms: float) -> str | None:
-        """Record a frame time; return a lower level to apply, or None.
+        """Record a frame time; once the window fills, decide and return the target level.
 
         Ignores warmup frames (first-use shader compiles) and stall frames (a
         streaming burst on one frame must not drag the median it is judged by).
+        Returns the target level to settle at, or None to keep the start level.
         """
+        if self.decided:
+            return None
         self._seen += 1
         if self._seen <= self.warmup:
             return None
@@ -143,26 +175,27 @@ class AutoQuality:
         if len(self._samples) < self.window:
             return None
         med = sorted(self._samples)[len(self._samples) // 2]
-        self._samples.clear()
         self.last_median = med
-        idx = ORDER.index(self.level)
-        if med > self._down_ms and idx > 0:
-            return ORDER[idx - 1]        # still converging; not yet decided
-        self.decided = True              # in-band, or at the low rail: settled
-        return None
-
-    def note_applied(self, level: str) -> None:
-        """Acknowledge that ``level`` is now live; start a fresh measurement window."""
-        self.level = level
-        self._samples.clear()
+        self.decided = True
+        # Estimate each rung's frame time from the one measured (time scales with the
+        # cost_weight ratio) and take the highest rung that holds the band; if none do,
+        # the cheapest rung.
+        start_w = PRESETS[self.level].cost_weight
+        tgt = LADDER[0]
+        for name in reversed(LADDER):                      # high -> low
+            if med * PRESETS[name].cost_weight / start_w <= self._down_ms:
+                tgt = name
+                break
+        self.target = tgt if tgt != self.level else None
+        return self.target
 
 
 def next_level(level: str, step: int) -> str:
-    """The preset ``step`` places from ``level`` on the low->high ladder, clamped."""
-    idx = max(0, min(len(ORDER) - 1, ORDER.index(level) + step))
-    return ORDER[idx]
+    """The rung ``step`` places from ``level`` on the low->high ladder, clamped."""
+    idx = max(0, min(len(LADDER) - 1, LADDER.index(level) + step))
+    return LADDER[idx]
 
 
 def next_level_cycle(level: str) -> str:
-    """The next preset on a wrapping low->medium->high->low cycle (for a toggle key)."""
-    return ORDER[(ORDER.index(level) + 1) % len(ORDER)]
+    """The next rung on a wrapping low->...->high->low cycle (for the F8 toggle)."""
+    return LADDER[(LADDER.index(level) + 1) % len(LADDER)]

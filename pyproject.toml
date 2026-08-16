@@ -44,3 +44,38 @@ where = ["src"]
 # the wheel (they are provenance, documented in ASSET-LICENSES.md).
 [tool.setuptools.package-data]
 openglcontext_forest_demo = ["assets/*", "CREDITS.txt"]
+
+# Lint standard: the OpenGLContext engine's E/W/F/B base, plus import-order, pyupgrade
+# and blind-except checks, so this new package ships without the usual first-release
+# lint drift. Documented, deliberate exceptions only.
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "B",    # flake8-bugbear
+    "I",    # import ordering
+    "UP",   # pyupgrade (f-strings, modern typing)
+    "BLE",  # no blind except (broad catches must be justified)
+    "S110", # no silent try/except/pass
+]
+ignore = [
+    "E501",  # line too long -- kept readable by hand, not hard-wrapped (as in the engine)
+    "E741",  # ambiguous name -- x/z/s read naturally as coordinates/scales here
+    "E702",  # compound statement -- the numpy setup uses compact paired assignments
+             # (a = x[:, 0]; b = x[:, 1]) on purpose, the same readability call the
+             # engine makes for E501
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The entry modules must set the OPENGLCONTEXT_* env the engine reads at import time
+# BEFORE importing it, so their imports are deliberately not all at the top.
+"src/openglcontext_forest_demo/run.py" = ["E402"]
+"src/openglcontext_forest_demo/__main__.py" = ["E402"]
+# The grass-clump baking tool drives raw core-profile GL and uses the GL namespace
+# wholesale, as GL scripts do.
+"tools/bake_grass_clump.py" = ["F403", "F405"]

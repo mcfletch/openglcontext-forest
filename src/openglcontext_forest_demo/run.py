@@ -52,20 +52,24 @@ screen and the launch notice both show):
 - "Low Poly Forest Tree Pack" by 99.Miles.
 """
 import logging
-import os, sys, math, time
+import math
+import os
 import pathlib
-from typing import Any, List, Optional
+import sys
+import time
+from typing import Any
 
 os.environ.setdefault("OPENGLCONTEXT_PROFILE", "core")
 os.environ.setdefault("OPENGLCONTEXT_RENDERER", "pbr")
 os.environ.setdefault("OPENGLCONTEXT_BACKEND", "glfw")
-from OpenGLContext import testingcontext, quaternion
+from OpenGLContext import quaternion, testingcontext
 from OpenGLContext.contextdefinition import ContextDefinition
 from OpenGLContext.move import modes as movemodes
 from OpenGLContext.move.terrainwalk import TerrainWalkMixin
 from OpenGLContext.ui import bindings, settings
 from OpenGLContext.ui.overlay import OverlayMixin
 from OpenGLContext.viewer.overlay import ScreenshotMixin
+
 BaseContext = testingcontext.getInteractive()
 
 from openglcontext_forest_demo import menu
@@ -97,7 +101,7 @@ SCREEN_KEYS = (
 )
 
 
-def movement_modes() -> List[Any]:
+def movement_modes() -> list[Any]:
     """The ways of moving this demo offers, as declared nodes.
 
     Declared rather than hand-rolled so the F6 page can present them and rebind
@@ -129,13 +133,14 @@ class Forest(OverlayMixin, ScreenshotMixin, TerrainWalkMixin, BaseContext):
     under a menu somebody is reading.
     """
 
-    config: Optional[ForestConfig] = None   # set by main() (defaults for a bare run)
+    config: ForestConfig | None = None   # set by main() (defaults for a bare run)
     screenshotName = "forest-%Y-%m-%dT%H-%M-%S.png"
 
     def OnInit(self):
         try:
-            import glfw; glfw.swap_interval(0)
-        except Exception:
+            import glfw
+            glfw.swap_interval(0)   # best-effort: uncap the loop for benching
+        except Exception:  # noqa: BLE001, S110 -- glfw optional; leave vsync as-is on any failure
             pass
         cfg = self.config if self.config is not None else ForestConfig()
         self.eye_height = cfg.eye_height
@@ -181,70 +186,135 @@ class Forest(OverlayMixin, ScreenshotMixin, TerrainWalkMixin, BaseContext):
         self._quality = 'medium'
         self._auto = None
         self._frame_t = None
+        self._pending_quality = None    # a deferred auto downgrade, applied on first move
+        self._last_xz = None
+        self._render_wh = None          # last render size, to re-measure quality on a resize
         mode = (getattr(cfg, 'quality', 'auto') or 'auto').lower()
+        self._auto_mode = (mode == 'auto')   # re-measure on resize only while auto is in charge
         if mode == 'auto':
+            # Start at the shipped 'high' look: a capable GPU (the primary target)
+            # holds it and never changes. A GPU that can't sustain it measures once,
+            # picks a lower target, and that target is applied deferred -- folded into
+            # the next streaming move so it is not seen popping in place.
             self._auto = qual.AutoQuality(target_fps=60.0, start='high')
             self._apply_quality('high', announce=False)
         else:
             self._apply_quality(mode, announce=False)
-        print("quality: %s%s  (F8 cycles low/medium/high)" % (
-            mode, " — measuring" if self._auto is not None else ""))
+        measuring = " — measuring" if self._auto is not None else ""
+        print(f"quality: {mode}{measuring}  (F8 cycles the quality rungs)")
 
         print_controls()
 
     # -- render quality ---------------------------------------------------
-    def _apply_quality(self, level, announce=True):
-        """Point the live scene at preset ``level`` and restream so it shows at once."""
+    def _apply_quality(self, level, announce=True, defer=False):
+        """Point the live scene at preset ``level``.
+
+        With ``defer`` the change is held until the next streaming move
+        (:meth:`_flush_pending_quality`), so an auto downgrade folds into the churn
+        the field already does as the camera walks; re-scattering the whole field in
+        place while standing still is what reads as the grass popping to a sparser
+        set. A direct pick (F8) applies at once."""
         self._quality = level
+        if defer:
+            self._pending_quality = level
+            return
+        self._pending_quality = None
         qual.apply_to_scene(self.scene, qual.PRESETS[level])
         try:
             x, z = self._tw_xz()
-        except Exception:
+        except Exception:  # noqa: BLE001 -- nav not live yet at first apply; fall back to spawn
             x, z = self.scene.spawn
         try:
             self._stream_near(x, z); self._stream_far(x, z); self._stream_impostors(x, z)
-        except Exception:
-            pass   # before the walk/nav is live the first OnIdle will stream instead
+        except Exception:  # noqa: BLE001, S110 -- before nav is live the first OnIdle streams instead
+            pass
         self.triggerRedraw(1)
         if announce:
-            print("quality -> %s" % level); sys.stdout.flush()
+            print(f"quality -> {level}"); sys.stdout.flush()
+
+    def _flush_pending_quality(self):
+        """Apply a deferred quality change at the next move (see :meth:`_apply_quality`)."""
+        level = self._pending_quality
+        if level is None:
+            return
+        self._pending_quality = None
+        qual.apply_to_scene(self.scene, qual.PRESETS[level])
+        x, z = self._tw_xz()
+        self._near_stream.request(x, z)
+        self._far_stream.request(x, z)
+        self._request_impostors(x, z)
 
     def cycleQuality(self, event=None):
         """F8: step low -> medium -> high -> low.  A manual pick freezes auto."""
         self._auto = None
+        self._auto_mode = False        # a hand pick wins; stop re-measuring on resize
         self._apply_quality(qual.next_level_cycle(self._quality))
-        return None
+
+    def OnResize(self, width, height, *a):
+        """Re-measure quality at a new render size (fill cost scales with pixels).
+
+        A GPU that held ``high`` in a window may not at fullscreen and vice versa, so
+        a material size change restarts the one-shot auto measurement from the current
+        level; the new pick applies deferred, like any auto change. Only while auto is
+        in charge -- a hand F8 pick is left alone."""
+        r = super().OnResize(width, height, *a)
+        if self._auto_mode:
+            prev = self._render_wh
+            px, ppx = int(width) * int(height), (prev[0] * prev[1] if prev else 0)
+            if prev is None or abs(px - ppx) > 0.15 * max(px, 1):
+                self._auto = qual.AutoQuality(target_fps=60.0, start=self._quality)
+                self._frame_t = None
+            self._render_wh = (int(width), int(height))
+        return r
 
     def _request_impostors(self, x, z):
         """Ask the impostor worker to re-cull to the current forward view cone."""
         fx, fz = self._tw_forward()
         self._imp_stream.request(x, z, fx, fz)
 
+    def OnIdle(self, *a):
+        """Apply a deferred auto-quality change on the first move, then walk/stream."""
+        if self._pending_quality is not None and self.platform is not None:
+            xz = self._tw_xz()
+            if self._last_xz is not None and (abs(xz[0] - self._last_xz[0])
+                                              + abs(xz[1] - self._last_xz[1])) > 0.4:
+                self._flush_pending_quality()
+            self._last_xz = xz
+        sup = super()
+        return sup.OnIdle(*a) if hasattr(sup, 'OnIdle') else None
+
     def OnDraw(self, *a, **k):
-        """Render, and while auto-quality is measuring, time frames and adapt."""
+        """Render, and while auto-quality is measuring, time one window and decide."""
         # Hand any finished off-thread stream result to its node before drawing, so
         # the fresh instances upload in this frame's render.
         for streamer in self._streamers:
             streamer.drain()
-        r = super(Forest, self).OnDraw(*a, **k)
+        # Re-center the clump LOD on the live camera every frame (cheap mask of the
+        # cached scatter), so the disc tracks the walk with no streaming lag -- the
+        # leading clumps fade in through the LOD band instead of popping up in density.
+        if self.platform is not None:
+            try:
+                self.scene.update_clump_lod(*self._tw_xz())
+            except Exception:  # noqa: BLE001, S110 -- best-effort re-center; never crash the draw
+                pass
+        r = super().OnDraw(*a, **k)
         if self._auto is not None:
             now = time.perf_counter()
             if self._frame_t is not None:
-                was_decided = self._auto.decided
-                new = self._auto.add_frame((now - self._frame_t) * 1000.0)
-                if new is not None and new != self._quality:
-                    self._apply_quality(new, announce=False)
-                    print("quality: auto measured %.1f ms -> %s" % (
-                        self._auto.last_median, new)); sys.stdout.flush()
-                    self._auto.note_applied(new)
-                elif self._auto.decided and not was_decided:
+                self._auto.add_frame((now - self._frame_t) * 1000.0)
+                if self._auto.decided:
                     m = self._auto.last_median
-                    print("quality: auto settled on %s (%.1f ms, %.0f fps)" % (
-                        self._quality, m, 1000.0 / m if m else 0.0)); sys.stdout.flush()
+                    fps = 1000.0 / m if m else 0.0
+                    if self._auto.target is not None and self._auto.target != self._quality:
+                        self._apply_quality(self._auto.target, announce=False, defer=True)
+                        print(f"quality: auto measured {fps:.0f} fps at high -> "
+                              f"{self._auto.target} (applies as you move)")
+                    else:
+                        print(f"quality: auto kept {self._quality} ({fps:.0f} fps)")
+                    sys.stdout.flush()
+                    self._auto = None       # one measurement, one decision, then done
             self._frame_t = now
-            # Force frames only until the first decision; afterwards let natural
-            # redraws feed the picker so it can still drop a rung in dense forest.
-            if not self._auto.decided:
+            if self._auto is not None:      # keep force-redrawing until the window fills
                 self.triggerRedraw(1)
         return r
 
@@ -285,8 +355,8 @@ class Forest(OverlayMixin, ScreenshotMixin, TerrainWalkMixin, BaseContext):
     def menuSubtitle(self) -> str:
         """What the menu says under its title: how big the world behind it is."""
         cfg = self.config if self.config is not None else ForestConfig()
-        return '%d trees over %.1f km of Great Smoky Mountains elevation' % (
-            len(self.scene.collider_pos), cfg.extent / 1000.0)
+        return (f"{len(self.scene.collider_pos)} trees over "
+                f"{cfg.extent / 1000.0:.1f} km of Great Smoky Mountains elevation")
 
     def closeMenu(self, event: Any = None) -> None:
         """Put the menu away, leaving the forest showing."""
@@ -318,7 +388,7 @@ class Forest(OverlayMixin, ScreenshotMixin, TerrainWalkMixin, BaseContext):
         # Reads the back buffer, which holds the frame just drawn only until it
         # is swapped away.
         self.takePendingScreenshot()
-        return super(Forest, self).SwapBuffers()
+        return super().SwapBuffers()
 
     # -- streaming --------------------------------------------------------
     # Streamer methods delegate to the scene so a Forest subclass (bench, capture, a
@@ -386,7 +456,7 @@ def print_controls():
     sys.stdout.write(
         "  mouse steers, w a s d move, shift runs, space jumps\n"
         "  m cycles walk / fly / mouse-look, f flies, g free-fly camera\n"
-        "  F6 keys, F8 quality (low/medium/high), F10 rendering settings, F2 "
+        "  F6 keys, F8 quality, F10 rendering settings, F2 "
         "screenshot, alt+f developer overlay, escape menu\n")
     sys.stdout.flush()
 

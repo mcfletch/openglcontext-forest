@@ -61,22 +61,40 @@ screens, so this demo, `oglc-view` and `twitch` are driven the same way.
 ## Quality and performance
 
 `--quality` chooses how much near-field grass the scene carries — the layer that
-dominates GPU cost — across `high` (the shipped look), `medium` and `low`:
+dominates GPU cost — over a five-rung ladder from `high` (the shipped look) down
+through `medhigh`, `medium`, `medlow` to `low`:
 
 ```bash
 oglc-forest --quality medium
 ```
 
-The default, `--quality auto`, measures the frame rate at start-up and steps the
-preset down until the forest holds ~60 fps, so an integrated GPU lands on `medium`
-and a discrete one stays at `high`; shadows stay on. `F8` cycles the preset by hand
-at any time, which both picks a level and shows what each one costs.
+The default, `--quality auto`, renders the shipped `high` look and measures the frame
+rate once at start-up, then picks the **highest rung that holds ~60 fps** (scaling the
+measurement by each rung's known relative cost) — so it lands on the fullest level the
+GPU can sustain rather than jumping straight to `low`. A capable GPU keeps `high` and
+never changes. A GPU that can't sustain it applies its pick **as you next move**,
+folded into the grass the field is already restreaming rather than re-scattering the
+whole field in place while you stand still (which is what reads as a pop). It decides
+once — and **re-measures if you resize or go fullscreen**, since fill cost scales with
+pixels (an integrated GPU can hold `high` in a window but not fullscreen). Shadows stay
+on. `F8` cycles the rungs by hand at any time.
 
-The real-geometry grass clumps carry a distance LOD: full-detail blades close to the
-camera, a coarser-mesh set from ~45% of the clump radius out to its edge, cross-fading
-at the boundary. Most of the disc area is in the far band, so the coarse set carries
-most of the clumps at a fraction of the per-clump vertex cost — the `high` look at close
-to the `medium` frame time. `--clump-far-length-samples` tunes the far detail.
+The real-geometry grass clumps carry a distance LOD in two layers: a coarse-mesh
+base drawn over the whole disc, and a full-detail overlay for the clumps near the
+camera. The overlay is drawn first and dithers out with distance into the coarse
+base beneath it (same texture, so the handoff is seamless); the base is always
+present, so the camera-following LOD boundary can never leave a gap as you walk.
+Most of the disc is covered only by the coarse base, so it carries most of the
+clumps at a fraction of the per-clump vertex cost — the `high` look at close to the
+`medium` frame time. `--clump-far-length-samples` tunes the base detail.
+
+The clump disc tracks the camera every frame: the scatter is cached over a disc a
+little wider than the drawn one, and each frame the drawn near/far subsets are
+re-selected from that cache against the live camera position. So the disc's leading
+edge fades in through the LOD band as you approach it, rather than the mid-distance
+clumps stepping up in density each time a streaming boundary recentred a lagging
+disc. The per-frame re-selection is a cheap distance mask; the instance store is
+orphaned before each rewrite so the upload never stalls on the previous frame's draw.
 
 The camera-following grass and impostors re-scatter as you move. That scatter runs
 on a background thread and the render loop only uploads the finished arrays, so

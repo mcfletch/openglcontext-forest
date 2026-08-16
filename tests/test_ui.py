@@ -8,12 +8,10 @@ checked here rather than against a window.
 import pathlib
 
 import pytest
-
 from OpenGLContext.move import modes as movemodes
 
 from openglcontext_forest_demo import menu, run
 from openglcontext_forest_demo.config import ForestConfig
-
 
 # -- how the demo moves -------------------------------------------------------
 

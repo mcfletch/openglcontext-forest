@@ -4,19 +4,24 @@
 Writes shots/shot_*.png near fir (high/steep) clusters to check foliage/trunk bleed
 and the distant-grass fill.
 """
-import os, sys, math
+import math
+import os
+import sys
+from typing import ClassVar
+
 os.environ.setdefault("OPENGLCONTEXT_BACKEND", "glfw")
 os.environ["OPENGLCONTEXT_DISABLE_FPS_DISPLAY"] = "1"
 import numpy as np
-from openglcontext_forest_demo import run as demo   # needs `pip install -e .`
 import OpenGL.GL as gl
 from PIL import Image
+
+from openglcontext_forest_demo import run as demo  # needs `pip install -e .`
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shots"); os.makedirs(OUT, exist_ok=True)
 
 
 class Cap(demo.Forest):
-    _shots = []     # (x,z) viewpoints, filled in OnInit
+    _shots: ClassVar[list] = []     # (x,z) viewpoints, filled in OnInit
     _i = 0; _warm = 0
 
     def OnInit(self):
@@ -32,7 +37,7 @@ class Cap(demo.Forest):
 
     def OnIdle(self, *a):
         if self.platform is None:
-            return None
+            return
         wx, wz = self._shots[self._i]
         cx, cz = wx - 18 * math.sin(self._i), wz - 18 * math.cos(self._i)
         y = self.hf.height_at(cx, cz) + self.eye_height
@@ -40,10 +45,10 @@ class Cap(demo.Forest):
         yaw = math.atan2(wx - cx, wz - cz)
         try:
             self.platform.setOrientation((0, 1, 0, yaw))
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 -- orientation is best-effort for the shot
             pass
         self._stream_near(cx, cz); self._stream_far(cx, cz)
-        self.triggerRedraw(1); return None
+        self.triggerRedraw(1); return
 
     def OnDraw(self, *a, **k):
         r = super().OnDraw(*a, **k)
@@ -54,11 +59,11 @@ class Cap(demo.Forest):
         w, h = self.getViewPort()
         try:
             gl.glReadBuffer(gl.GL_BACK)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 -- some drivers default to BACK already
             pass
         buf = gl.glReadPixels(0, 0, w, h, gl.GL_RGB, gl.GL_UNSIGNED_BYTE)
         img = Image.frombytes("RGB", (w, h), buf).transpose(Image.FLIP_TOP_BOTTOM)
-        p = os.path.join(OUT, "shot_%d.png" % self._i); img.save(p); print("wrote", p)
+        p = os.path.join(OUT, f"shot_{self._i}.png"); img.save(p); print("wrote", p)
         self._i += 1
         if self._i >= len(self._shots):
             sys.stdout.flush()   # os._exit skips the buffers

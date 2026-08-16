@@ -12,11 +12,15 @@ prints the card aspect (full width / height) to use as the billboard ``width``.
 
 Requires glfw + PyOpenGL (offscreen GL), numpy, pillow.
 """
-import os, sys, ctypes, argparse
+import argparse
+import ctypes
+import os
+import sys
+
 import numpy as np
-from PIL import Image
 from OpenGL.GL import *
 from OpenGL.GL.shaders import compileProgram, compileShader
+from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
@@ -29,7 +33,7 @@ def bake(glb, out, size=512):
     import glfw
     from OpenGLContext.scenegraph.vegetation import load_clump_glb
 
-    P, N, UV, idx, texpath = load_clump_glb(glb)          # height-normalised to 1.0
+    P, _N, UV, idx, texpath = load_clump_glb(glb)          # height-normalised to 1.0
     hx = float(np.max(np.abs(P[:, 0])))                    # front-view half-width
     hy = float(P[:, 1].max())
 
@@ -90,8 +94,8 @@ def bake(glb, out, size=512):
     img.save(out)
     cov = (np.asarray(img)[..., 3] > 10).mean()
     glfw.terminate()
-    print("baked %s  (%dx%d, width/height aspect=%.2f, silhouette coverage=%.1f%%)"
-          % (out, size, size, 2 * hx / hy, 100 * cov))
+    print(f"baked {out}  ({size}x{size}, width/height aspect={2 * hx / hy:.2f}, "
+          f"silhouette coverage={100 * cov:.1f}%)")
     return 2 * hx / hy
 
 

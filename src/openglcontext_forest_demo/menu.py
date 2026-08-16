@@ -14,14 +14,15 @@ and ``twitch`` show.
 """
 from __future__ import annotations
 
-from typing import Any, Callable, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 from OpenGLContext.ui import dialogs
 from OpenGLContext.ui.layout import Column
 from OpenGLContext.ui.panel import Panel
 from OpenGLContext.ui.widgets import Button, Label, Separator
 
-__all__ = ['MENU_NAME', 'CREDITS_NAME', 'TITLE', 'main_menu', 'credits_screen']
+__all__ = ['CREDITS_NAME', 'MENU_NAME', 'TITLE', 'credits_screen', 'main_menu']
 
 #: What the demo calls itself on its own front screen.
 TITLE = 'OpenGLContext forest demo'
@@ -39,11 +40,11 @@ MENU_COLUMNS = 44
 CREDITS_COLUMNS = 78
 
 
-def main_menu(on_resume: Optional[Callable[[], None]] = None,
-              on_bindings: Optional[Callable[[], None]] = None,
-              on_settings: Optional[Callable[[], None]] = None,
-              on_credits: Optional[Callable[[], None]] = None,
-              on_quit: Optional[Callable[[], None]] = None,
+def main_menu(on_resume: Callable[[], None] | None = None,
+              on_bindings: Callable[[], None] | None = None,
+              on_settings: Callable[[], None] | None = None,
+              on_credits: Callable[[], None] | None = None,
+              on_quit: Callable[[], None] | None = None,
               subtitle: str = '') -> Panel:
     """The screen Escape brings up, with the walk still behind it.
 
@@ -51,7 +52,7 @@ def main_menu(on_resume: Optional[Callable[[], None]] = None,
     always a forest to go back to: somebody who pressed Escape meaning "close
     this" must never find they have quit instead.
     """
-    children: List[Any] = [Label(text=TITLE, name='title')]
+    children: list[Any] = [Label(text=TITLE, name='title')]
     if subtitle:
         children.append(Label(text=subtitle, wrap=True, name='subtitle'))
     children.append(Separator(top=6))

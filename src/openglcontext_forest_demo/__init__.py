@@ -31,13 +31,29 @@ upload lazily on first render), so call it inside a live GL context's ``OnInit``
 Asset licensing is documented in ``ASSET-LICENSES.md`` (tree models are CC-BY 4.0
 and require attribution, printed on launch).
 """
+from openglcontext_forest_demo.config import (
+    ForestConfig,
+    build_arg_parser,
+    config_from_args,
+)
 from openglcontext_forest_demo.run import (
-    main, Forest, movement_modes, credits_text, print_credits)
-from openglcontext_forest_demo.config import ForestConfig, config_from_args, build_arg_parser
-from openglcontext_forest_demo.scene import build_forest_scene, ForestScene
+    Forest,
+    credits_text,
+    main,
+    movement_modes,
+    print_credits,
+)
+from openglcontext_forest_demo.scene import ForestScene, build_forest_scene
 
 __all__ = [
-    "main", "Forest", "movement_modes", "credits_text", "print_credits",
-    "ForestConfig", "config_from_args", "build_arg_parser",
-    "build_forest_scene", "ForestScene",
+    "Forest",
+    "ForestConfig",
+    "ForestScene",
+    "build_arg_parser",
+    "build_forest_scene",
+    "config_from_args",
+    "credits_text",
+    "main",
+    "movement_modes",
+    "print_credits",
 ]

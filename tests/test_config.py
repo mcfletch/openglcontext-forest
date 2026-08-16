@@ -9,7 +9,11 @@ import dataclasses
 import pytest
 
 import openglcontext_forest_demo as fd
-from openglcontext_forest_demo.config import ForestConfig, build_arg_parser, config_from_args
+from openglcontext_forest_demo.config import (
+    ForestConfig,
+    build_arg_parser,
+    config_from_args,
+)
 
 
 def test_reusable_api_is_importable():
@@ -30,19 +34,19 @@ def test_parser_accepts_empty_argv():
 
 def test_defaults_match_documented_values():
     c = ForestConfig()
-    expected = dict(
-        extent=4096.0, relief=450.0, res=513,
-        tree_density=0.09, tree_radius=2200.0, spacing_base=0.8, spacing_per_m=0.06,
-        tree_scale_min=0.75, tree_scale_max=1.45,
-        clump_radius=30.0, grass_far_radius=700.0, grass_mid_density=3.5, clump_density=9.0,
-        clump_scale=0.42, clump_length_samples=4, clump_far_length_samples=1,
-        grass_sun=0.36, grass_mid_scale=0.42,
-        grass_far_density=0.09,
-        impostor_cone_deg=75.0, near_mesh_radius=56.0,
-        fov_deg=62.0, eye_height=1.7, near=0.25, far=9000.0,
-        seed=1,
-        quality="auto",
-    )
+    expected = {
+        "extent": 4096.0, "relief": 450.0, "res": 513,
+        "tree_density": 0.09, "tree_radius": 2200.0, "spacing_base": 0.8, "spacing_per_m": 0.06,
+        "tree_scale_min": 0.75, "tree_scale_max": 1.45,
+        "clump_radius": 30.0, "grass_far_radius": 700.0, "grass_mid_density": 3.5, "clump_density": 9.0,
+        "clump_scale": 0.42, "clump_length_samples": 4, "clump_far_length_samples": 1,
+        "grass_sun": 0.36, "grass_mid_scale": 0.42,
+        "grass_far_density": 0.09,
+        "impostor_cone_deg": 75.0, "near_mesh_radius": 56.0,
+        "fov_deg": 62.0, "eye_height": 1.7, "near": 0.25, "far": 9000.0,
+        "seed": 1,
+        "quality": "auto",
+    }
     got = {f.name: getattr(c, f.name) for f in dataclasses.fields(c)}
     assert got == expected
 
@@ -93,16 +97,20 @@ def test_build_forest_scene_smoke():
     import os
     try:
         from openglcontext_forest_demo.scene import (
-            build_forest_scene, ForestScene, HEIGHTMAP, CONTROL)
-    except Exception as exc:  # import-time GL/deps problem
-        pytest.skip("scene import unavailable: %r" % (exc,))
+            CONTROL,
+            HEIGHTMAP,
+            ForestScene,
+            build_forest_scene,
+        )
+    except Exception as exc:  # noqa: BLE001 -- any import-time GL/deps problem -> skip
+        pytest.skip(f"scene import unavailable: {exc!r}")
     if not (os.path.exists(HEIGHTMAP) and os.path.exists(CONTROL)):
         pytest.skip("terrain assets not bundled")
     cfg = ForestConfig(res=129, tree_radius=60.0, grass_far_radius=80.0)
     try:
         scene = build_forest_scene(cfg)
-    except Exception as exc:
-        pytest.skip("build_forest_scene needs resources unavailable here: %r" % (exc,))
+    except Exception as exc:  # noqa: BLE001 -- missing runtime resources here -> skip
+        pytest.skip(f"build_forest_scene needs resources unavailable here: {exc!r}")
     assert isinstance(scene, ForestScene)
     assert scene.hf is not None
     assert scene.sceneGraph is not None

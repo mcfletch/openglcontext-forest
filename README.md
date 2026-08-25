@@ -49,7 +49,7 @@ You start in **mouse-look**: the pointer steers and the forest is walked, not fl
 | `escape` | the menu: Resume, Controls, Settings, Asset credits, Quit |
 | `F6` / `F10` | the key bindings / the rendering settings |
 | `F8` | cycle the render-quality preset (low / medium / high) |
-| `F2` | save a screenshot into the working directory |
+| `F2` | save a screenshot into your picture folder |
 | `alt` + `f` | the developer overlay |
 
 The keys are not fixed here: each way of moving is a declared `MovementMode` node

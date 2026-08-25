@@ -68,7 +68,6 @@ from OpenGLContext.move import modes as movemodes
 from OpenGLContext.move.terrainwalk import TerrainWalkMixin
 from OpenGLContext.ui import bindings, settings
 from OpenGLContext.ui.overlay import OverlayMixin
-from OpenGLContext.viewer.overlay import ScreenshotMixin
 
 BaseContext = testingcontext.getInteractive()
 
@@ -119,7 +118,7 @@ def movement_modes() -> list[Any]:
     ]
 
 
-class Forest(OverlayMixin, ScreenshotMixin, TerrainWalkMixin, BaseContext):
+class Forest(OverlayMixin, TerrainWalkMixin, BaseContext):
     """Walk the forest: build the shared scene, then walk, look and stream.
 
     Thin glue over :func:`build_forest_scene` — swapping this navigation for a
@@ -134,7 +133,6 @@ class Forest(OverlayMixin, ScreenshotMixin, TerrainWalkMixin, BaseContext):
     """
 
     config: ForestConfig | None = None   # set by main() (defaults for a bare run)
-    screenshotName = "forest-%Y-%m-%dT%H-%M-%S.png"
 
     def OnInit(self):
         try:
@@ -383,12 +381,6 @@ class Forest(OverlayMixin, ScreenshotMixin, TerrainWalkMixin, BaseContext):
         """Step to the next declared movement mode, as ``m`` does in twitch."""
         navigation = self.getNavigation()
         return navigation.cycle() if navigation is not None else None
-
-    def SwapBuffers(self) -> Any:
-        # Reads the back buffer, which holds the frame just drawn only until it
-        # is swapped away.
-        self.takePendingScreenshot()
-        return super().SwapBuffers()
 
     # -- streaming --------------------------------------------------------
     # Streamer methods delegate to the scene so a Forest subclass (bench, capture, a

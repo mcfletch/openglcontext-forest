@@ -81,9 +81,20 @@ def test_the_screen_keys_are_bound_as_key_downs():
         assert (kind, state) == ('keyboard', 1)
 
 
-def test_the_screenshot_key_writes_a_named_file():
+def test_the_screenshot_key_is_the_one_every_context_has():
+    """F2 comes from the engine; the demo binds nothing of its own for it."""
     assert run.Forest.screenshotKey == '<F2>'
-    assert 'forest' in run.Forest.screenshotName
+
+
+def test_the_shot_is_named_for_the_demo():
+    """The window title names the file, so a picture folder says which took it."""
+    from types import SimpleNamespace
+
+    from OpenGLContext.screenshot import ScreenshotMixin
+
+    named = ScreenshotMixin()
+    named.contextDefinition = SimpleNamespace(title=menu.TITLE)
+    assert 'forest' in named.screenshotTitle()
 
 
 # -- the menu -----------------------------------------------------------------

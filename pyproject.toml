@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Multimedia :: Graphics :: 3D Rendering",
 ]
 dependencies = [
-    "OpenGLContext",
+    "OpenGLContext>=3.0.0a3",
     "numpy>=2.0",
     "pillow",
     "PyOpenGL>=4.0.0a1",

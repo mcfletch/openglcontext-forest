@@ -59,7 +59,6 @@ import sys
 import time
 from typing import Any
 
-os.environ.setdefault("OPENGLCONTEXT_PROFILE", "core")
 os.environ.setdefault("OPENGLCONTEXT_RENDERER", "pbr")
 os.environ.setdefault("OPENGLCONTEXT_BACKEND", "glfw")
 from OpenGLContext import quaternion, testingcontext
@@ -158,7 +157,7 @@ class Forest(OverlayMixin, TerrainWalkMixin, BaseContext):
         # because that is where the avatar is stood up.
         self.init_walk(scene.hf, scene.collider_pos, scene.collider_radius)
         self.setupPhysics(enable=True)
-        self.setupScreenshots()
+        self.setupScreenshotKey()
         self.bindScreenKeys()
         # Register the SAME reusable streamers a driving demo would; impostor
         # culling needs the camera forward vector, which this navigation supplies.

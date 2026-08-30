@@ -286,7 +286,7 @@ def build_forest_scene(config: ForestConfig) -> ForestScene:
     # Grass grows on any soft ground (forest floor, meadow, moss) but NOT on rock:
     # scatter is thinned by (1 - rock weight) from the control map, so it stays lush
     # where you walk yet vanishes on bare mountainsides instead of dotting them with
-    # green blobs. Reuses the HeightField bilinear sampler over the terrain extent.
+    # green blobs. Reuses the HeightField sampler to read the map over the extent.
     from PIL import Image
     _ctl = np.asarray(Image.open(CONTROL).convert("RGBA").resize((config.res, config.res), Image.LANCZOS),
                       np.float32) / 255.0

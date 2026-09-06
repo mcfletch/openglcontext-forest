@@ -134,11 +134,10 @@ class Forest(OverlayMixin, TerrainWalkMixin, BaseContext):
     config: ForestConfig | None = None   # set by main() (defaults for a bare run)
 
     def OnInit(self):
-        try:
-            import glfw
-            glfw.swap_interval(0)   # best-effort: uncap the loop for benching
-        except Exception:  # noqa: BLE001, S110 -- glfw optional; leave vsync as-is on any failure
-            pass
+        # Uncap the loop, for benching and because a forced redraw blocks on
+        # a swap nobody is presenting.  Through the engine, so it works
+        # whichever backend the window came from.
+        self.setVSync(False)
         cfg = self.config if self.config is not None else ForestConfig()
         self.eye_height = cfg.eye_height
         scene = build_forest_scene(cfg)

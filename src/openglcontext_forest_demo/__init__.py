@@ -31,6 +31,12 @@ upload lazily on first render), so call it inside a live GL context's ``OnInit``
 Asset licensing is documented in ``ASSET-LICENSES.md`` (tree models are CC-BY 4.0
 and require attribution, printed on launch).
 """
+
+#: The distribution's version, which `pyproject.toml` reads through
+#: `[tool.setuptools.dynamic]` -- one place to bump, and the place the release
+#: tooling looks.
+__version__ = "1.0.0a1"
+
 from openglcontext_forest_demo.config import (
     ForestConfig,
     build_arg_parser,
@@ -56,4 +62,5 @@ __all__ = [
     "main",
     "movement_modes",
     "print_credits",
+    "__version__",
 ]

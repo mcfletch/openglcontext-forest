@@ -82,6 +82,9 @@ class AsyncStreamer:
                     return
                 args = self._req
                 self._req = None
+            # The wait above exits only when a request has arrived or `_stop`
+            # is set, and `_stop` returned; so there is a request here.
+            assert args is not None
             try:
                 payload = self._compute(*args)
             except Exception:

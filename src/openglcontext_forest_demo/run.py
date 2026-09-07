@@ -117,7 +117,8 @@ def movement_modes() -> list[Any]:
     ]
 
 
-class Forest(OverlayMixin, TerrainWalkMixin, BaseContext):
+class Forest(OverlayMixin, TerrainWalkMixin,
+             BaseContext):  # type: ignore[misc,valid-type]  # base chosen at run time
     """Walk the forest: build the shared scene, then walk, look and stream.
 
     Thin glue over :func:`build_forest_scene` — swapping this navigation for a

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openglcontext-forest-demo"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Walkable forest demo for OpenGLContext: real-DEM splat terrain with GPU-instanced tree/grass LOD."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,6 +27,13 @@ dependencies = [
     "glfw>=2.5",
 ]
 
+[project.optional-dependencies]
+# What the suite needs beyond the runtime. The tests here open no GL context --
+# they cover the config round-trip, the quality presets, the streaming maths and
+# the menu -- so this is the whole of it and a runner with no graphics runs them.
+test = ["pytest>=7", "pytest-timeout"]
+dev = ["openglcontext-forest-demo[test]", "ruff", "mypy"]
+
 [project.urls]
 Homepage = "http://pyopengl.sourceforge.net/context/"
 
@@ -38,6 +45,9 @@ package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = { attr = "openglcontext_forest_demo.__version__" }
 
 # Bundle the runtime geometry/textures/heightmaps the demo loads. The large source
 # .glb models they were baked from live in ../assets-source and are NOT shipped in
@@ -79,3 +89,41 @@ ignore = [
 # The grass-clump baking tool drives raw core-profile GL and uses the GL namespace
 # wholesale, as GL scripts do.
 "tools/bake_grass_clump.py" = ["F403", "F405"]
+
+[tool.mypy]
+# Matches the interpreter the stack is developed and tested against. The shipped
+# numpy stubs use syntax that only parses under 3.12, so a lower value here does
+# not check an older Python -- it aborts on numpy's own stub before checking
+# anything at all.
+python_version = "3.12"
+warn_unused_ignores = true
+# The engine ships no stubs and is not itself fully annotated; what is checked
+# here is this package, not what it imports.
+ignore_missing_imports = true
+follow_imports = "silent"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+# Backstop so one wedged scene build cannot hold a session open.
+timeout = 300
+
+[tool.tox]
+env_list = ["py310", "py311", "py312", "py313", "py314"]
+
+[tool.tox.env_run_base]
+extras = ["test"]
+# OpenGLContext and the stack under it publish pre-release versions, which pip
+# skips by default; without this the resolver reports them "not available".
+pip_pre = true
+commands = [["pytest", { replace = "posargs", extend = true }]]
+
+# uv decides whether its cached metadata for a source tree is still current from
+# pyproject.toml alone. This project's version lives in the package's
+# __init__.py, so name that file too: without it a version bump leaves uv
+# answering with the previous number.
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "src/openglcontext_forest_demo/__init__.py" },
+]

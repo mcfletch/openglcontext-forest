@@ -288,7 +288,7 @@ def build_forest_scene(config: ForestConfig) -> ForestScene:
     # where you walk yet vanishes on bare mountainsides instead of dotting them with
     # green blobs. Reuses the HeightField sampler to read the map over the extent.
     from PIL import Image
-    _ctl = np.asarray(Image.open(CONTROL).convert("RGBA").resize((config.res, config.res), Image.LANCZOS),
+    _ctl = np.asarray(Image.open(CONTROL).convert("RGBA").resize((config.res, config.res), Image.Resampling.LANCZOS),
                       np.float32) / 255.0
     _grass_allowed = np.clip(1.0 - _ctl[..., LAYERS.index("rock")], 0.0, 1.0)
     _rock_mask = HeightField(_grass_allowed, config.extent, 1.0).sample

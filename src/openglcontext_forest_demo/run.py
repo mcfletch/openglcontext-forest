@@ -134,7 +134,7 @@ class Forest(OverlayMixin, TerrainWalkMixin,
 
     config: ForestConfig | None = None   # set by main() (defaults for a bare run)
 
-    def OnInit(self):
+    def OnInit(self) -> None:
         # Uncap the loop, for benching and because a forced redraw blocks on
         # a swap nobody is presenting.  Through the engine, so it works
         # whichever backend the window came from.
@@ -181,11 +181,15 @@ class Forest(OverlayMixin, TerrainWalkMixin,
         # step it down to what the GPU holds; high/medium/low freeze the choice.
         # F8 cycles it by hand.
         self._quality = 'medium'
-        self._auto = None
-        self._frame_t = None
-        self._pending_quality = None    # a deferred auto downgrade, applied on first move
-        self._last_xz = None
-        self._render_wh = None          # last render size, to re-measure quality on a resize
+        self._auto: Any = None
+        #: When the last timed frame began, while auto-quality is measuring.
+        self._frame_t: float | None = None
+        #: A deferred auto downgrade, applied on the first move.
+        self._pending_quality: str | None = None
+        #: Where the camera stood when the last move was noticed.
+        self._last_xz: tuple[float, float] | None = None
+        #: Last render size, to re-measure quality on a resize.
+        self._render_wh: tuple[int, int] | None = None
         mode = (getattr(cfg, 'quality', 'auto') or 'auto').lower()
         self._auto_mode = (mode == 'auto')   # re-measure on resize only while auto is in charge
         if mode == 'auto':
@@ -203,7 +207,8 @@ class Forest(OverlayMixin, TerrainWalkMixin,
         print_controls()
 
     # -- render quality ---------------------------------------------------
-    def _apply_quality(self, level, announce=True, defer=False):
+    def _apply_quality(self, level: str, announce: bool = True,
+                       defer: bool = False) -> None:
         """Point the live scene at preset ``level``.
 
         With ``defer`` the change is held until the next streaming move
@@ -229,7 +234,7 @@ class Forest(OverlayMixin, TerrainWalkMixin,
         if announce:
             print(f"quality -> {level}"); sys.stdout.flush()
 
-    def _flush_pending_quality(self):
+    def _flush_pending_quality(self) -> None:
         """Apply a deferred quality change at the next move (see :meth:`_apply_quality`)."""
         level = self._pending_quality
         if level is None:
@@ -241,13 +246,13 @@ class Forest(OverlayMixin, TerrainWalkMixin,
         self._far_stream.request(x, z)
         self._request_impostors(x, z)
 
-    def cycleQuality(self, event=None):
+    def cycleQuality(self, event: Any = None) -> None:
         """F8: step low -> medium -> high -> low.  A manual pick freezes auto."""
         self._auto = None
         self._auto_mode = False        # a hand pick wins; stop re-measuring on resize
         self._apply_quality(qual.next_level_cycle(self._quality))
 
-    def OnResize(self, width, height, *a):
+    def OnResize(self, width: int, height: int, *a: Any) -> None:
         """Re-measure quality at a new render size (fill cost scales with pixels).
 
         A GPU that held ``high`` in a window may not at fullscreen and vice versa, so
@@ -264,12 +269,12 @@ class Forest(OverlayMixin, TerrainWalkMixin,
             self._render_wh = (int(width), int(height))
         return r
 
-    def _request_impostors(self, x, z):
+    def _request_impostors(self, x: float, z: float) -> None:
         """Ask the impostor worker to re-cull to the current forward view cone."""
         fx, fz = self._tw_forward()
         self._imp_stream.request(x, z, fx, fz)
 
-    def OnIdle(self, *a):
+    def OnIdle(self, *a: Any) -> Any:
         """Apply a deferred auto-quality change on the first move, then walk/stream."""
         if self._pending_quality is not None and self.platform is not None:
             xz = self._tw_xz()
@@ -280,7 +285,7 @@ class Forest(OverlayMixin, TerrainWalkMixin,
         sup = super()
         return sup.OnIdle(*a) if hasattr(sup, 'OnIdle') else None
 
-    def OnDraw(self, *a, **k):
+    def OnDraw(self, *a: Any, **k: Any) -> Any:
         """Render, and while auto-quality is measuring, time one window and decide."""
         # Hand any finished off-thread stream result to its node before drawing, so
         # the fresh instances upload in this frame's render.
@@ -384,13 +389,13 @@ class Forest(OverlayMixin, TerrainWalkMixin,
     # -- streaming --------------------------------------------------------
     # Streamer methods delegate to the scene so a Forest subclass (bench, capture, a
     # driving demo) can drive the veg fields with the familiar self._stream_* names.
-    def _stream_near(self, x, z):
+    def _stream_near(self, x: float, z: float) -> None:
         self.scene.stream_near(x, z)
 
-    def _stream_far(self, x, z):
+    def _stream_far(self, x: float, z: float) -> None:
         self.scene.stream_far(x, z)
 
-    def _stream_impostors(self, x, z):
+    def _stream_impostors(self, x: float, z: float) -> None:
         fx, fz = self._tw_forward()
         self.scene.stream_impostors(x, z, fx, fz)
 
@@ -434,7 +439,7 @@ def credits_text() -> str:
         return FALLBACK_CREDITS
 
 
-def print_credits():
+def print_credits() -> None:
     """Print the CC-BY attribution notices required for the tree models used."""
     print("=" * 74)
     print(credits_text())
@@ -442,7 +447,7 @@ def print_credits():
     sys.stdout.flush()   # CC-BY attribution must reach the user even if stdout is piped
 
 
-def print_controls():
+def print_controls() -> None:
     """Say what the keys do, for someone who ran it from a terminal."""
     sys.stdout.write(
         "  mouse steers, w a s d move, shift runs, space jumps\n"
@@ -452,7 +457,7 @@ def print_controls():
     sys.stdout.flush()
 
 
-def main():
+def main() -> None:
     """Console entry point (``oglc-forest``): parse knobs, print attributions, run."""
     Forest.config = config_from_args()
     print_credits()

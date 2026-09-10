@@ -17,6 +17,7 @@ import math
 import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 from OpenGLContext.loaders.tiles3d import vegetation
@@ -73,16 +74,17 @@ CLUMP_STREAM_MARGIN = 11.0
 SINK = np.array([0.10, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.17, 0.02, 0.02, 0.02], np.float32)
 
 
-def A(name):
+def A(name: str) -> str:
     """Path to a bundled demo asset."""
     return os.path.join(ASSETS, name)
 
 
-def _shape(geometry):
+def _shape(geometry: Any) -> Shape:
     return Shape(geometry=geometry, appearance=Appearance(material=Material()))
 
 
-def _trunk_metrics(npz_path, part_key):
+def _trunk_metrics(npz_path: str,
+                   part_key: str) -> tuple[float, float, float]:
     """Trunk axis (cx, cz) and core radius for a species mesh, in local units.
 
     Measured over a mid-height band (above the ground flare/buttress roots, below the
@@ -120,8 +122,10 @@ class ForestScene:
     grass_far: InstancedBillboards
     # two clump LOD nodes (or both None if the clump asset is missing): full detail
     # near, coarse mesh far, cross-fading at CLUMP_LOD_FRAC * clump_radius
-    clumps_near: object
-    clumps_far: object
+    #: The two clump LOD nodes, or None where the clump mesh could not be
+    #: built -- a scene without them draws its grass as billboards alone.
+    clumps_near: InstancedClumps | None
+    clumps_far: InstancedClumps | None
     grass_mask: Callable
     clump_radius: float
     grass_far_radius: float
@@ -129,7 +133,7 @@ class ForestScene:
     near_mesh_radius: float
     collider_pos: np.ndarray
     collider_radius: np.ndarray
-    near_species: list
+    near_species: list[dict[str, Any]]
     spawn: tuple                     # (ex, ez) walkable spawn point
 
     #: Cached clump scatter (positions, yaws, scales) over a disc a margin wider than
@@ -137,10 +141,12 @@ class ForestScene:
     #: draw subset from it against the *live* camera every frame, so the clump disc
     #: tracks the camera with no streaming lag -- what would otherwise read as the
     #: mid-distance clumps popping up in density each time the disc recentres.
-    _clump_cache: object = field(default=None, init=False, repr=False)
+    _clump_cache: tuple[Any, Any, Any] | None = field(
+        default=None, init=False, repr=False)
     #: Camera position the drawn clump subset was last selected at; the selection is
     #: skipped while the camera holds still (a still disc needs no re-selection).
-    _clump_lod_center: object = field(default=None, init=False, repr=False)
+    _clump_lod_center: tuple[float, float] | None = field(
+        default=None, init=False, repr=False)
 
     # --- reusable camera-following streamers (register on the move loop) ---
     # Each field splits into a pure ``compute_*`` (the numpy scatter/cull — GL-free,
@@ -149,7 +155,7 @@ class ForestScene:
     # ``stream_*`` wrappers do both in line, for the first fill and for a live
     # quality change where the restream should show at once.
 
-    def retune_clumps(self):
+    def retune_clumps(self) -> None:
         """Set the clump LOD nodes' fade windows from the current ``clump_radius``.
 
         The far (coarse) node is the complete base layer: every clump in the disc,
@@ -159,7 +165,7 @@ class ForestScene:
         occludes the coarse base where it is present, and dithers OUT across
         ``[0.8 R1, R1]`` into that base (same texture -> seamless). Called at build and
         whenever a quality change moves ``clump_radius``."""
-        if self.clumps_near is None:
+        if self.clumps_near is None or self.clumps_far is None:
             return
         r = self.clump_radius
         r1 = r * CLUMP_LOD_FRAC
@@ -170,7 +176,7 @@ class ForestScene:
             if node._gl is not None:
                 node._commit_constants()
 
-    def compute_near(self, x, z):
+    def compute_near(self, x: float, z: float) -> tuple[Any, Any, Any]:
         """Scatter the near field at ``(x, z)``: mid grass, near tree meshes, real clumps.
 
         Mid grass billboards are short like the clumps and dense enough to overlap
@@ -191,7 +197,7 @@ class ForestScene:
                 self.hf, scale_mul=cfg.clump_scale, mask=self.grass_mask)
         return mid, near_pending, clump_scatter
 
-    def apply_near(self, payload):
+    def apply_near(self, payload: tuple[Any, Any, Any]) -> None:
         """Stage a :meth:`compute_near` result on the GL thread."""
         mid, near_pending, clump_scatter = payload
         self.grass.update_instances(*mid)
@@ -200,7 +206,7 @@ class ForestScene:
             self._clump_cache = clump_scatter
             self._clump_lod_center = None      # new cache: force a re-selection
 
-    def update_clump_lod(self, x, z):
+    def update_clump_lod(self, x: float, z: float) -> None:
         """Re-select the drawn clump subsets from the cache against camera ``(x, z)``.
 
         The coarse base draws every clump within ``clump_radius`` and the full-detail
@@ -209,7 +215,8 @@ class ForestScene:
         band instead of snapping up in density when a restream recentres it. Cheap
         (two distance masks + an instance upload); runs on the GL thread each frame."""
         cache = self._clump_cache
-        if cache is None or self.clumps_near is None:
+        if (cache is None or self.clumps_near is None
+                or self.clumps_far is None):
             return
         c = self._clump_lod_center
         if c is not None and abs(x - c[0]) + abs(z - c[1]) < 0.05:
@@ -224,25 +231,26 @@ class ForestScene:
         self.clumps_far.update_instances(p[far], y[far], s[far])
         self.clumps_near.update_instances(p[near], y[near], s[near])
 
-    def stream_near(self, x, z):
+    def stream_near(self, x: float, z: float) -> None:
         """Restream the near field synchronously (first fill / quality change)."""
         self.apply_near(self.compute_near(x, z))
         self.update_clump_lod(x, z)
 
-    def compute_far(self, x, z):
+    def compute_far(self, x: float, z: float) -> Any:
         """Scatter the coarse far-grass disc that follows the camera to the horizon."""
         return world_grid_scatter(x, z, self.grass_far_radius, self.config.grass_far_density,
                                   self.hf, scale_mul=FAR_GRASS_SCALE_MUL, mask=self.grass_mask)
 
-    def apply_far(self, payload):
+    def apply_far(self, payload: Any) -> None:
         """Stage a :meth:`compute_far` result on the GL thread."""
         self.grass_far.update_instances(*payload)
 
-    def stream_far(self, x, z):
+    def stream_far(self, x: float, z: float) -> None:
         """Restream the far-grass disc synchronously."""
         self.apply_far(self.compute_far(x, z))
 
-    def compute_impostors(self, x, z, fx, fz):
+    def compute_impostors(self, x: float, z: float, fx: float,
+                          fz: float) -> list[tuple[Any, Any, Any, Any]]:
         """The impostor cards inside the forward view cone `(fx, fz)`, per species.
 
         A forward cone (dot > 0, dot^2 > cos^2 * dist^2 tests the angle without a
@@ -262,12 +270,14 @@ class ForestScene:
             out.append((node, P[keep], Y[keep], S[keep]))
         return out
 
-    def apply_impostors(self, payload):
+    def apply_impostors(
+        self, payload: list[tuple[Any, Any, Any, Any]]) -> None:
         """Stage a :meth:`compute_impostors` result on the GL thread."""
         for node, p, y, s in payload:
             node.update_instances(p, y, s)
 
-    def stream_impostors(self, x, z, fx, fz):
+    def stream_impostors(self, x: float, z: float, fx: float,
+                         fz: float) -> None:
         """Cull and submit the impostor cards synchronously."""
         self.apply_impostors(self.compute_impostors(x, z, fx, fz))
 
@@ -293,7 +303,7 @@ def build_forest_scene(config: ForestConfig) -> ForestScene:
     _grass_allowed = np.clip(1.0 - _ctl[..., LAYERS.index("rock")], 0.0, 1.0)
     _rock_mask = HeightField(_grass_allowed, config.extent, 1.0).sample
 
-    def grass_mask(px, pz):
+    def grass_mask(px: Any, pz: Any) -> Any:
         # thin grass out on steep ground: on a slope a wide clump's uphill side
         # buries under the terrain (only blade tips show), and steep rock faces
         # shouldn't be grassed anyway. slope is rise/run; full grass below ~29deg,
@@ -313,7 +323,7 @@ def build_forest_scene(config: ForestConfig) -> ForestScene:
             break
 
     # dense forest across gentle-to-moderate slopes (conifers tolerate steeper ground)
-    def gentle(p):
+    def gentle(p: Any) -> Any:
         x = p[:, 0]; z = p[:, 2]
         clear = np.hypot(x - ex, z - ez) > 13.0     # small clearing at the spawn
         return (hf.slope(x, z) < 0.72) & clear
@@ -347,7 +357,9 @@ def build_forest_scene(config: ForestConfig) -> ForestScene:
 
     # near-mesh species table (npz + opaque/foliage part keys + texture paths).
     # ids: 0 fir, 1 noel, 2-5 maple, 6-12 realistic.
-    near_species = [
+    # The shape `InstancedMeshLOD` declares for a species: a mesh file, the
+    # four array keys for each of its two parts, and a texture for each.
+    near_species: list[dict[str, Any]] = [
         {"npz": A("fir.npz"), "o_keys": ("oP", "oN", "oU", "oI"), "o_tex": A("fir_bark.png"),
              "b_keys": ("bP", "bN", "bU", "bI"), "b_tex": A("fir_branch.png")},
         {"npz": A("noel.npz"), "o_keys": ("oP", "oN", "oU", "oI"), "o_tex": A("noel_bark.png"),
@@ -378,7 +390,8 @@ def build_forest_scene(config: ForestConfig) -> ForestScene:
     impostors = []
     impostor_cos = math.cos(math.radians(config.impostor_cone_deg))
 
-    def impostor(mask, tex, width):   # every species fades near -> replaced by its near-mesh
+    def impostor(mask: Any, tex: Any, width: float) -> None:
+        # every species fades near -> replaced by its near-mesh
         if mask.any():
             node = InstancedBillboards(tp[mask], yaws[mask], heights[mask], A(tex + ".png"),
                                        width=width, near_fade=True)

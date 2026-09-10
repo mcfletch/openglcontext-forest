@@ -12,6 +12,7 @@ demo constructs its own config and gets the identical world.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from dataclasses import dataclass, fields
 
 
@@ -153,7 +154,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return p
 
 
-def config_from_args(argv=None) -> ForestConfig:
+def config_from_args(argv: Sequence[str] | None = None) -> ForestConfig:
     """Parse `argv` (default `sys.argv`) into a `ForestConfig`.
 
     The parser's namespace attribute names match the dataclass fields, so this is a

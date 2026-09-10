@@ -24,6 +24,7 @@ high/medium/low explicitly freezes that choice.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from openglcontext_forest_demo.config import ForestConfig
 
@@ -87,7 +88,7 @@ ORDER = LADDER
 CHOICES = ["auto", *reversed(LADDER)]
 
 
-def apply_to_scene(scene, preset: QualityPreset) -> None:
+def apply_to_scene(scene: Any, preset: QualityPreset) -> None:
     """Point a live :class:`~openglcontext_forest_demo.scene.ForestScene` at ``preset``.
 
     Mutates the streaming knobs the scene reads each frame and re-pushes the LOD
@@ -106,7 +107,7 @@ def apply_to_scene(scene, preset: QualityPreset) -> None:
     # Keep the cross-fade windows consistent with the new radii. Each node sends
     # these as constants at GL init, so re-commit to push the new values; guard on
     # _gl so this is a no-op before first render (the fresh values upload then).
-    def recommit(node) -> None:
+    def recommit(node: Any) -> None:
         if node is not None and getattr(node, "_gl", None) is not None:
             node._commit_constants()
 

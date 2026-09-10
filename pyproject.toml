@@ -96,6 +96,12 @@ ignore = [
 # not check an older Python -- it aborts on numpy's own stub before checking
 # anything at all.
 python_version = "3.12"
+# Every definition states its types, and a body is checked rather than skipped:
+# an unannotated parameter is `Any`, and an `Any` travelling through a call is
+# a check that reports success without having compared anything.
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
 warn_unused_ignores = true
 # The engine ships no stubs and is not itself fully annotated; what is checked
 # here is this package, not what it imports.

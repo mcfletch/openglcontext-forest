@@ -19,13 +19,17 @@ geometry/textures/heightmaps.
 Once published, no checkout needed:
 
 ```bash
-uvx --with openglcontext-forest-demo oglc-forest
+uv run --with openglcontext-forest-demo oglc-forest
+# or, to run it without keeping anything: uvx --from openglcontext-forest-demo oglc-forest
 ```
 
-From this repository (engine + demo are local, editable):
+`--with` and `--from` both name the *package*; `oglc-forest` is the command it
+provides, and uv looks for a package under that name if it is given one.
+
+From a checkout of the workspace (engine and demo local and editable):
 
 ```bash
-uv pip install -e ./openglcontext -e ./forest-demo
+uv pip install -e ./openglcontext -e ./openglcontext-forest
 oglc-forest
 # or: python -m openglcontext_forest_demo
 ```

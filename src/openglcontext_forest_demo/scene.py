@@ -37,10 +37,13 @@ from OpenGLContext.scenegraph.vegetation import (
     world_grid_scatter,
 )
 
+from openglcontext_forest_demo import content
 from openglcontext_forest_demo.config import ForestConfig
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ASSETS = os.path.join(HERE, "assets")
+#: Where the art is. The base pack once it has been fetched, the copy in the
+#: wheel until then -- see :mod:`openglcontext_forest_demo.content`.
+ASSETS = content.art_directory()
 HEIGHTMAP = os.path.join(ASSETS, "forest_height.png")
 CONTROL = os.path.join(ASSETS, "forest_control.png")
 CLUMP_GLB = os.path.join(ASSETS, "basic-clump.glb")

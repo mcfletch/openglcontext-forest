@@ -29,6 +29,11 @@ jobs:
       version: ${{ steps.check.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The art is in Git LFS, and checkout fetches pointers unless told.
+          # A wheel built without this carries 232 KB of text where 66 MB of
+          # PNG, GLB and NPZ belong, and the demo cannot open its own heightmap.
+          lfs: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -77,6 +82,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The art is in Git LFS, and checkout fetches pointers unless told.
+          # A wheel built without this carries 232 KB of text where 66 MB of
+          # PNG, GLB and NPZ belong, and the demo cannot open its own heightmap.
+          lfs: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

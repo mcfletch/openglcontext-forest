@@ -20,11 +20,15 @@ classifiers = [
     "Topic :: Multimedia :: Graphics :: 3D Rendering",
 ]
 dependencies = [
-    "OpenGLContext>=3.0.0a3",
+    # The extras are the engine's to install: `run.py` selects the glfw backend
+    # through the environment, and the tree meshes and grass clump load through
+    # the glTF loader, so this package imports neither itself. The floor names
+    # the pre-release because an installer skips one it was not asked for by
+    # name.
+    "OpenGLContext[glfw,gltf]>=3.0.0a4",
     "numpy>=2.0",
     "pillow",
     "PyOpenGL>=4.0.0a1",
-    "glfw>=2.5",
 ]
 
 [project.optional-dependencies]

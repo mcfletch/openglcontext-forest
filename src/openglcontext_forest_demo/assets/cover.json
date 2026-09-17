@@ -1,0 +1,173 @@
+{
+ "species": [
+  {
+   "name": "fern_02_b",
+   "card": "fern_02_b_card.png",
+   "clump": "fern_02.glb",
+   "clumpMesh": "fern_02_b",
+   "clumpFarMesh": "fern_02_b_far",
+   "density": 0.7,
+   "height": 0.4277,
+   "cardWidth": 2.506,
+   "sunLevel": 0.42,
+   "patchiness": 0.7,
+   "patchMetres": 22.0,
+   "canopy": [
+    3.0,
+    16.0
+   ]
+  },
+  {
+   "name": "fern_02_c",
+   "card": "fern_02_c_card.png",
+   "clump": "fern_02.glb",
+   "clumpMesh": "fern_02_c",
+   "clumpFarMesh": "fern_02_c_far",
+   "density": 0.7,
+   "height": 0.349,
+   "cardWidth": 2.595,
+   "sunLevel": 0.42,
+   "patchiness": 0.7,
+   "patchMetres": 22.0,
+   "canopy": [
+    3.0,
+    16.0
+   ]
+  },
+  {
+   "name": "grass_medium_01_large_a",
+   "card": "grass_medium_01_large_a_card.png",
+   "clump": "grass_medium_01.glb",
+   "clumpMesh": "grass_medium_01_large_a",
+   "clumpFarMesh": "grass_medium_01_large_a_far",
+   "density": 11.0,
+   "height": 0.1467,
+   "cardWidth": 2.5153,
+   "sunLevel": 0.42,
+   "patchiness": 0.25,
+   "patchMetres": 26.0,
+   "canopy": null
+  },
+  {
+   "name": "grass_medium_01_large_c",
+   "card": "grass_medium_01_large_c_card.png",
+   "clump": "grass_medium_01.glb",
+   "clumpMesh": "grass_medium_01_large_c",
+   "clumpFarMesh": "grass_medium_01_large_c_far",
+   "density": 11.0,
+   "height": 0.1423,
+   "cardWidth": 2.1052,
+   "sunLevel": 0.42,
+   "patchiness": 0.25,
+   "patchMetres": 26.0,
+   "canopy": null
+  },
+  {
+   "name": "grass_medium_02_b",
+   "card": "grass_medium_02_b_card.png",
+   "clump": "grass_medium_02.glb",
+   "clumpMesh": "grass_medium_02_b",
+   "clumpFarMesh": "grass_medium_02_b_far",
+   "density": 4.0,
+   "height": 0.1796,
+   "cardWidth": 1.1964,
+   "sunLevel": 0.42,
+   "patchiness": 0.25,
+   "patchMetres": 26.0,
+   "canopy": null
+  },
+  {
+   "name": "grass_medium_02_d",
+   "card": "grass_medium_02_d_card.png",
+   "clump": "grass_medium_02.glb",
+   "clumpMesh": "grass_medium_02_d",
+   "clumpFarMesh": "grass_medium_02_d_far",
+   "density": 4.0,
+   "height": 0.2604,
+   "cardWidth": 1.528,
+   "sunLevel": 0.42,
+   "patchiness": 0.25,
+   "patchMetres": 26.0,
+   "canopy": null
+  },
+  {
+   "name": "nettle_plant_tall_a",
+   "card": "nettle_plant_tall_a_card.png",
+   "clump": "nettle_plant.glb",
+   "clumpMesh": "nettle_plant_tall_a",
+   "clumpFarMesh": "nettle_plant_tall_a_far",
+   "density": 0.8,
+   "height": 0.2168,
+   "cardWidth": 0.4964,
+   "sunLevel": 0.42,
+   "patchiness": 0.7,
+   "patchMetres": 20.0,
+   "canopy": [
+    0.5,
+    7.0
+   ]
+  },
+  {
+   "name": "nettle_plant_tall_b",
+   "card": "nettle_plant_tall_b_card.png",
+   "clump": "nettle_plant.glb",
+   "clumpMesh": "nettle_plant_tall_b",
+   "clumpFarMesh": "nettle_plant_tall_b_far",
+   "density": 0.8,
+   "height": 0.1927,
+   "cardWidth": 0.532,
+   "sunLevel": 0.42,
+   "patchiness": 0.7,
+   "patchMetres": 20.0,
+   "canopy": [
+    0.5,
+    7.0
+   ]
+  },
+  {
+   "name": "periwinkle_plant_01",
+   "card": "periwinkle_plant_01_card.png",
+   "clump": "periwinkle_plant.glb",
+   "clumpMesh": "periwinkle_plant_01",
+   "clumpFarMesh": "periwinkle_plant_01_far",
+   "density": 0.35,
+   "height": 0.3972,
+   "cardWidth": 0.8543,
+   "sunLevel": 0.42,
+   "patchiness": 0.15,
+   "patchMetres": 26.0,
+   "canopy": null
+  },
+  {
+   "name": "periwinkle_plant_02",
+   "card": "periwinkle_plant_02_card.png",
+   "clump": "periwinkle_plant.glb",
+   "clumpMesh": "periwinkle_plant_02",
+   "clumpFarMesh": "periwinkle_plant_02_far",
+   "density": 0.35,
+   "height": 0.4107,
+   "cardWidth": 0.6588,
+   "sunLevel": 0.42,
+   "patchiness": 0.15,
+   "patchMetres": 26.0,
+   "canopy": null
+  },
+  {
+   "name": "shrub_04",
+   "card": "shrub_04_card.png",
+   "clump": "shrub_04.glb",
+   "clumpMesh": "shrub_04",
+   "clumpFarMesh": "shrub_04_far",
+   "density": 0.5,
+   "height": 0.2192,
+   "cardWidth": 3.0653,
+   "sunLevel": 0.42,
+   "patchiness": 0.8,
+   "patchMetres": 34.0,
+   "canopy": [
+    0.3,
+    5.0
+   ]
+  }
+ ]
+}

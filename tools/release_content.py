@@ -93,7 +93,7 @@ def refuse_pointers(where: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--tag", default="content-v1",
+    parser.add_argument("--tag", default="content-v2",
                         help="the release tag the artefact is attached to")
     parser.add_argument("--into", default="dist/content",
                         help="where to write the archive")
@@ -116,9 +116,10 @@ def main(argv: list[str] | None = None) -> int:
         "base": True,
         "copyright": _credits(),
         "marker": MARKER,
-        "notes": "The terrain, the trees and their impostors. Fetched before "
-                 "the first frame, because the demo opens its heightmap "
-                 "before it opens a window.",
+        "notes": "The terrain, the trees and their impostors, and the plants "
+                 "that grow between them. Fetched before the first frame, "
+                 "because the demo opens its heightmap before it opens a "
+                 "window.",
     }
     out = os.path.join("src", "openglcontext_forest_demo", "packs.json")
     with open(out, "w", encoding="utf-8") as handle:
@@ -136,9 +137,9 @@ def _credits() -> str:
     CREDITS.txt travels inside the pack for the rest.
     """
     return ("Tree models by Georgeous, 3D Error 404 and LOLIPOP (CC-BY 4.0); "
-            "ground materials from ambientCG (CC0 1.0); terrain and impostors "
-            "generated for this demo. Full attribution in CREDITS.txt inside "
-            "the pack.")
+            "ground cover plants from Poly Haven and ground materials from "
+            "ambientCG (both CC0 1.0); terrain and impostors generated for "
+            "this demo. Full attribution in CREDITS.txt inside the pack.")
 
 
 if __name__ == "__main__":

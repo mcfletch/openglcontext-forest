@@ -4,15 +4,15 @@
   {
    "key": "openglcontext-forest/art",
    "title": "Forest demo art",
-   "url": "https://github.com/mcfletch/openglcontext-forest/releases/download/content-v1/forest-art.tar.gz",
+   "url": "https://github.com/mcfletch/openglcontext-forest/releases/download/content-v2/forest-art.tar.gz",
    "directory": "art",
    "archive": "tar",
-   "approximate_bytes": 61670014,
-   "sha256": "c9a03e495b06c13d2fa3302b5e0b24cdbb4be7473d0787f18977445bb1d9e466",
+   "approximate_bytes": 68702469,
+   "sha256": "f7d7aa99d4d4eb43c2fa3f052c7cd8f79fe2bb0abbbf3333c6ae413983ae0674",
    "base": true,
-   "copyright": "Tree models by Georgeous, 3D Error 404 and LOLIPOP (CC-BY 4.0); ground materials from ambientCG (CC0 1.0); terrain and impostors generated for this demo. Full attribution in CREDITS.txt inside the pack.",
+   "copyright": "Tree models by Georgeous, 3D Error 404 and LOLIPOP (CC-BY 4.0); ground cover plants from Poly Haven and ground materials from ambientCG (both CC0 1.0); terrain and impostors generated for this demo. Full attribution in CREDITS.txt inside the pack.",
    "marker": "forest_height.png",
-   "notes": "The terrain, the trees and their impostors. Fetched before the first frame, because the demo opens its heightmap before it opens a window."
+   "notes": "The terrain, the trees and their impostors, and the plants that grow between them. Fetched before the first frame, because the demo opens its heightmap before it opens a window."
   }
  ]
 }

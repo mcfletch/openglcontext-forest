@@ -4,7 +4,8 @@ A walkable, forest demo for
 [OpenGLContext](http://pyopengl.sourceforge.net/context/): real Great-Smoky-Mountains
 elevation under a runtime multi-layer **splat terrain**, a GPU-instanced forest with
 distance **LOD** (real tree *meshes* near you, baked *impostor* billboards far off),
-two-layer camera-following grass, terrain sun-shadows and canopy shade, and
+a camera-following **forest floor** of grass, fern, nettle, periwinkle and shrub,
+terrain sun-shadows and canopy shade, and
 **mouse-look walking** with gravity (ground-clamped, blocked by trunks). ~230k trees,
 comfortably above 60 fps.
 
@@ -64,8 +65,8 @@ screens, so this demo, `oglc-view` and `twitch` are driven the same way.
 
 ## Quality and performance
 
-`--quality` chooses how much near-field grass the scene carries — the layer that
-dominates GPU cost — over a five-rung ladder from `high` (the shipped look) down
+`--quality` chooses how much near-field ground cover the scene carries — the layer
+that dominates GPU cost — over a five-rung ladder from `high` (the shipped look) down
 through `medhigh`, `medium`, `medlow` to `low`:
 
 ```bash
@@ -83,24 +84,36 @@ once — and **re-measures if you resize or go fullscreen**, since fill cost sca
 pixels (an integrated GPU can hold `high` in a window but not fullscreen). Shadows stay
 on. `F8` cycles the rungs by hand at any time.
 
-The real-geometry grass clumps carry a distance LOD in two layers: a coarse-mesh
-base drawn over the whole disc, and a full-detail overlay for the clumps near the
-camera. The overlay is drawn first and dithers out with distance into the coarse
-base beneath it (same texture, so the handoff is seamless); the base is always
-present, so the camera-following LOD boundary can never leave a gap as you walk.
-Most of the disc is covered only by the coarse base, so it carries most of the
-clumps at a fraction of the per-clump vertex cost — the `high` look at close to the
-`medium` frame time. `--clump-far-length-samples` tunes the base detail.
+The distance chain the cover is drawn through is the engine's
+(`OpenGLContext.scenegraph.vegetation.GroundCover`), and this demo only says what
+grows: real geometry in two levels of detail near you, cards past them, and a
+coarse field out to the haze. Most of the geometry disc is covered only by the
+decimated level, so it carries most of the plants at a fraction of the vertex cost
+— the `high` look at close to the `medium` frame time.
 
-The clump disc tracks the camera every frame: the scatter is cached over a disc a
-little wider than the drawn one, and each frame the drawn near/far subsets are
-re-selected from that cache against the live camera position. So the disc's leading
-edge fades in through the LOD band as you approach it, rather than the mid-distance
-clumps stepping up in density each time a streaming boundary recentred a lagging
-disc. The per-frame re-selection is a cheap distance mask; the instance store is
-orphaned before each rewrite so the upload never stalls on the previous frame's draw.
+The geometry disc tracks the camera every frame: the scatter is cached over a disc
+a little wider than the drawn one, and each frame the drawn subsets are re-selected
+from that cache against the live camera position. So the disc's leading edge fades
+in through the level-of-detail band as you approach it, rather than the
+mid-distance cover stepping up in density each time a streaming boundary recentred
+a lagging disc.
 
-The camera-following grass and impostors re-scatter as you move. That scatter runs
+## What grows on the floor
+
+The undergrowth is a *set* of plants, not one repeated: grass, fern, nettle,
+periwinkle and shrub, baked from CC0 scans published by
+[Poly Haven](https://polyhaven.com/) (see [ASSET-LICENSES.md](ASSET-LICENSES.md)).
+Each says how densely it grows, how much it gathers into beds, and what depth of
+tree cover it grows under — so ferns stand in beds in the shade, shrubs take the
+gaps where the trees thin out and the edges of clearings, grass runs through all
+of it and periwinkle flowers through the grass. `--cover-density` scales the whole
+set at once.
+
+What grows is read from `assets/cover.json`, which `oglc-bake-plants` (in
+`openglcontext-editor`) writes beside the models it names, so changing the mix is a
+re-bake rather than a code change.
+
+The camera-following cover and impostors re-scatter as you move. That scatter runs
 on a background thread and the render loop only uploads the finished arrays, so
 crossing a streaming boundary no longer lands its work on a single frame.
 

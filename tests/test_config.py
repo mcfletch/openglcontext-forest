@@ -38,10 +38,8 @@ def test_defaults_match_documented_values():
         "extent": 4096.0, "relief": 450.0, "res": 513,
         "tree_density": 0.09, "tree_radius": 2200.0, "spacing_base": 0.8, "spacing_per_m": 0.06,
         "tree_scale_min": 0.75, "tree_scale_max": 1.45,
-        "clump_radius": 30.0, "grass_far_radius": 700.0, "grass_mid_density": 3.5, "clump_density": 9.0,
-        "clump_scale": 0.42, "clump_length_samples": 4, "clump_far_length_samples": 1,
-        "grass_sun": 0.36, "grass_mid_scale": 0.42,
-        "grass_far_density": 0.09,
+        "clump_radius": 30.0, "grass_card_radius": 95.0, "grass_far_radius": 700.0,
+        "cover_density": 1.0,
         "impostor_cone_deg": 75.0, "near_mesh_radius": 56.0,
         "fov_deg": 62.0, "eye_height": 1.7, "near": 0.25, "far": 9000.0,
         "seed": 1,
@@ -63,14 +61,14 @@ def test_config_from_args_overrides():
         "--tree-density", "0.05",
         "--fov", "70",
         "--seed", "99",
-        "--clump-length-samples", "6",
+        "--cover-density", "0.5",
     ])
     assert cfg.clump_radius == 45.0
     assert cfg.grass_far_radius == 1200.0
     assert cfg.tree_density == 0.05
     assert cfg.fov_deg == 70.0
     assert cfg.seed == 99
-    assert cfg.clump_length_samples == 6
+    assert cfg.cover_density == 0.5
     # untouched knobs keep their defaults
     assert cfg.relief == ForestConfig().relief
     assert cfg.near_mesh_radius == ForestConfig().near_mesh_radius
@@ -83,9 +81,8 @@ def test_alias_flags():
 
 
 def test_int_flags_are_ints():
-    cfg = config_from_args(["--res", "257", "--clump-length-samples", "3", "--seed", "7"])
+    cfg = config_from_args(["--res", "257", "--seed", "7"])
     assert isinstance(cfg.res, int) and cfg.res == 257
-    assert isinstance(cfg.clump_length_samples, int) and cfg.clump_length_samples == 3
     assert isinstance(cfg.seed, int) and cfg.seed == 7
 
 

@@ -29,6 +29,20 @@ TREE MODELS — Creative Commons Attribution 4.0 (CC-BY 4.0), attribution requir
     under Creative Commons Attribution
     (http://creativecommons.org/licenses/by/4.0/).
 
+GROUND COVER PLANTS — CC0 (public domain, no attribution required):
+  * "Grass Medium 01" by Rob Tuytel and Rico Cilliers — https://polyhaven.com/a/grass_medium_01
+  * "Grass Medium 02" by Rico Cilliers — https://polyhaven.com/a/grass_medium_02
+  * "Fern 02" by Rob Tuytel and Rico Cilliers — https://polyhaven.com/a/fern_02
+  * "Nettle Plant" by Rob Tuytel and Rico Cilliers — https://polyhaven.com/a/nettle_plant
+  * "Periwinkle Plant" by Amal Kumar — https://polyhaven.com/a/periwinkle_plant
+  * "Shrub 04" by Rico Cilliers — https://polyhaven.com/a/shrub_04
+  All from Poly Haven (https://polyhaven.com/), CC0 1.0:
+  https://creativecommons.org/publicdomain/zero/1.0/
+  CC0 asks for no attribution. It is given because the work was given away.
+
+  The `*.glb` clumps and `*_card.png` billboards here are baked from those
+  scans by `oglc-bake-plants` (OpenGLContext-editor) and are CC0 as well.
+
 GROUND / DETAIL TEXTURES — CC0 (public domain, no attribution required):
   * ambientCG.com — Grass004, Ground042 (forest floor), Ground068 (dirt),
     Rock030, Snow006, Bark012. Cached under the per-user app-data directory.

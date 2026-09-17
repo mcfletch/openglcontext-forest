@@ -31,6 +31,41 @@ runtime assets. They are large (~140 MB total) and are **not shipped in the whee
 the sources with `tools/bake_assets.py` (mesh geometry reproduces exactly; impostors
 are re-rendered).
 
+## Ground cover plants — CC0 (public domain, no attribution required)
+
+The grass, ferns, nettles, periwinkle and shrub that grow between the trees are
+scanned models from [Poly Haven](https://polyhaven.com/), released
+[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) — no attribution
+required and no condition on redistribution. It is given anyway.
+
+| Model | Author | Source |
+|---|---|---|
+| Grass Medium 01 | Rob Tuytel, Rico Cilliers | <https://polyhaven.com/a/grass_medium_01> |
+| Grass Medium 02 | Rico Cilliers | <https://polyhaven.com/a/grass_medium_02> |
+| Fern 02 | Rob Tuytel, Rico Cilliers | <https://polyhaven.com/a/fern_02> |
+| Nettle Plant | Rob Tuytel, Rico Cilliers | <https://polyhaven.com/a/nettle_plant> |
+| Periwinkle Plant | Amal Kumar | <https://polyhaven.com/a/periwinkle_plant> |
+| Shrub 04 | Rico Cilliers | <https://polyhaven.com/a/shrub_04> |
+
+The runtime files — `<asset>.glb` (every variant of a plant at two levels of
+detail against one cutout texture), `<variant>_card.png` (the billboard it
+becomes at a distance) and `cover.json` (what grows, how densely, how much it
+clumps and what tree cover it grows under) — are baked from those by
+`oglc-bake-plants`, from `OpenGLContext-editor`. They are derivative works of
+CC0 sources and are CC0 themselves.
+
+Re-bake them with, for example:
+
+```bash
+oglc-bake-plants --out assets --per-asset 2 --patchiness 0.25 \
+    grass_medium_01=11.0 grass_medium_02=4.0
+oglc-bake-plants --out assets --per-asset 2 --patchiness 0.70 \
+    --patch-metres 22 --canopy 3.0 16.0 fern_02=0.70
+```
+
+The sources are fetched from Poly Haven's own API and kept in a per-user cache,
+so a re-bake asks them for nothing.
+
 ## Ground / detail textures — CC0 (public domain, no attribution required)
 
 Fetched at runtime from [ambientCG](https://ambientcg.com/) and cached under

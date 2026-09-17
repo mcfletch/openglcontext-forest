@@ -13,10 +13,11 @@ exact same world this way.
 """
 from __future__ import annotations
 
+import json
 import math
 import os
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -30,11 +31,10 @@ from OpenGLContext.scenegraph.basenodes import (
 )
 from OpenGLContext.scenegraph.terrain import HeightField, SplatTerrain
 from OpenGLContext.scenegraph.vegetation import (
+    CoverSpecies,
+    GroundCover,
     InstancedBillboards,
-    InstancedClumps,
     InstancedMeshLOD,
-    load_clump_glb,
-    world_grid_scatter,
 )
 
 from openglcontext_forest_demo import content
@@ -46,31 +46,21 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = content.art_directory()
 HEIGHTMAP = os.path.join(ASSETS, "forest_height.png")
 CONTROL = os.path.join(ASSETS, "forest_control.png")
-CLUMP_GLB = os.path.join(ASSETS, "basic-clump.glb")
+#: What grows between the trees, and how much of each there is. Baked from CC0
+#: scans by ``oglc-bake-plants``; see ASSET-LICENSES.md. The set is read from
+#: the art rather than listed here, so re-baking it with another plant in it
+#: needs no code change.
+COVER = os.path.join(ASSETS, "cover.json")
 LAYERS = ["forest_floor", "grass", "rock", "moss"]
 
 # Fixed handoff geometry that keeps the LOD cross-fades seamless — not user knobs:
 # nudging these desyncs the geometry->billboard blend, so they stay constants.
 TREE_SCATTER_SEED = 7          # tree layout seed (holds the shipped forest arrangement)
 BIOME_SEED = 11                # conifer/maple/deciduous mix seed
-MID_GRASS_FADE = 95.0          # mid grass billboard disc + fade-out distance, metres
-FAR_GRASS_NEAR_CUT = 90.0      # far grass fades IN here, just inside the mid fade-out
-FAR_GRASS_SCALE_MUL = 1.5      # far grass billboards run larger to stay readable at range
 IMPOSTOR_NEAR_DISC = 60.0      # always-drawn impostor disc so nothing pops at the feet on a spin
-GRASS_BILLBOARD_WIDTH = 2.6    # grass card width (matches the baked clump impostor aspect)
-CLUMP_SUN = (-0.5, -0.72, -0.48)   # per-fragment sun direction for the clump geometry
-#: Geometry-LOD split for the real clumps: full-detail clumps cover 0..FRAC*clump_radius,
-#: a coarse-mesh set covers the rest out to clump_radius. The outer 1-FRAC**2 of the disc
-#: area — most of the instances — turns coarse, which is where the vertex cost lives.
-CLUMP_LOD_FRAC = 0.45
-#: Each dither window (near-out, far-in, far-out) starts at this fraction of its outer edge.
-CLUMP_FADE_FRAC = 0.8
-#: The clump scatter is cached over a disc this much wider than the draw radius, so
-#: the per-frame camera-relative re-selection (:meth:`ForestScene.update_clump_lod`)
-#: always has clumps to draw out to ``clump_radius`` even after the cache's centre has
-#: lagged the camera between restreams. Must be >= the clump streamer's move threshold
-#: (10 m) so the cache never runs short at the disc edge.
-CLUMP_STREAM_MARGIN = 11.0
+#: Where the sun is for the cover geometry, which is lit per fragment. The same
+#: direction the terrain and the trees are lit from.
+COVER_SUN = (-0.5, -0.72, -0.48)
 
 # Per-species trunk-base sink so root flares/buttresses embed (fir flare, real3 buttress).
 # Indexed by near-mesh species id (0 fir, 1 noel, 2-5 maple, 6-12 realistic).
@@ -121,35 +111,17 @@ class ForestScene:
     near: InstancedMeshLOD
     # (node, positions, yaws, scales) per impostor species, for view-cone culling
     impostors: list
-    grass: InstancedBillboards
-    grass_far: InstancedBillboards
-    # two clump LOD nodes (or both None if the clump asset is missing): full detail
-    # near, coarse mesh far, cross-fading at CLUMP_LOD_FRAC * clump_radius
-    #: The two clump LOD nodes, or None where the clump mesh could not be
-    #: built -- a scene without them draws its grass as billboards alone.
-    clumps_near: InstancedClumps | None
-    clumps_far: InstancedClumps | None
+    #: Everything that grows between the trees: several kinds of plant, each
+    #: through the whole distance chain. The engine owns the chain; this scene
+    #: says what grows, where it may, and how dark it is under the canopy.
+    cover: GroundCover
     grass_mask: Callable
-    clump_radius: float
-    grass_far_radius: float
     impostor_cos: float
     near_mesh_radius: float
     collider_pos: np.ndarray
     collider_radius: np.ndarray
     near_species: list[dict[str, Any]]
     spawn: tuple                     # (ex, ez) walkable spawn point
-
-    #: Cached clump scatter (positions, yaws, scales) over a disc a margin wider than
-    #: the draw radius, refreshed each stream. :meth:`update_clump_lod` re-selects the
-    #: draw subset from it against the *live* camera every frame, so the clump disc
-    #: tracks the camera with no streaming lag -- what would otherwise read as the
-    #: mid-distance clumps popping up in density each time the disc recentres.
-    _clump_cache: tuple[Any, Any, Any] | None = field(
-        default=None, init=False, repr=False)
-    #: Camera position the drawn clump subset was last selected at; the selection is
-    #: skipped while the camera holds still (a still disc needs no re-selection).
-    _clump_lod_center: tuple[float, float] | None = field(
-        default=None, init=False, repr=False)
 
     # --- reusable camera-following streamers (register on the move loop) ---
     # Each field splits into a pure ``compute_*`` (the numpy scatter/cull — GL-free,
@@ -158,81 +130,45 @@ class ForestScene:
     # ``stream_*`` wrappers do both in line, for the first fill and for a live
     # quality change where the restream should show at once.
 
-    def retune_clumps(self) -> None:
-        """Set the clump LOD nodes' fade windows from the current ``clump_radius``.
+    @property
+    def clump_radius(self) -> float:
+        """How far the cover is drawn as real geometry, in metres."""
+        return self.cover.clump_radius
 
-        The far (coarse) node is the complete base layer: every clump in the disc,
-        dithering OUT only at the disc edge ``[0.8 radius, radius]`` (where the mid
-        grass billboards take over). The near (full-detail) node is an overlay of the
-        clumps within ``R1 = CLUMP_LOD_FRAC * clump_radius``; it is drawn first, so it
-        occludes the coarse base where it is present, and dithers OUT across
-        ``[0.8 R1, R1]`` into that base (same texture -> seamless). Called at build and
-        whenever a quality change moves ``clump_radius``."""
-        if self.clumps_near is None or self.clumps_far is None:
-            return
-        r = self.clump_radius
-        r1 = r * CLUMP_LOD_FRAC
-        self.clumps_near.fade_start, self.clumps_near.fade_end = r1 * CLUMP_FADE_FRAC, r1
-        self.clumps_far.cut_start, self.clumps_far.cut_end = 0.0, 0.0   # full base, no inner cut
-        self.clumps_far.fade_start, self.clumps_far.fade_end = r * CLUMP_FADE_FRAC, r
-        for node in (self.clumps_near, self.clumps_far):
-            if node._gl is not None:
-                node._commit_constants()
+    @clump_radius.setter
+    def clump_radius(self, metres: float) -> None:
+        self.cover.clump_radius = float(metres)
 
-    def compute_near(self, x: float, z: float) -> tuple[Any, Any, Any]:
-        """Scatter the near field at ``(x, z)``: mid grass, near tree meshes, real clumps.
+    @property
+    def grass_far_radius(self) -> float:
+        """How far the coarse cover cards follow the camera, in metres."""
+        return self.cover.far_radius
 
-        Mid grass billboards are short like the clumps and dense enough to overlap
-        into continuous cover, so the geometry->billboard band doesn't read as sparse
-        tufts. The clumps are scattered over a disc a margin *wider* than the draw
-        radius and cached whole; :meth:`update_clump_lod` picks the drawn near/far
-        subsets from that cache against the live camera each frame, so the disc never
-        lags the walk. Returns ``(mid, near_pending, clump_scatter)`` for
-        :meth:`apply_near`."""
-        cfg = self.config
-        mid = world_grid_scatter(x, z, MID_GRASS_FADE, cfg.grass_mid_density, self.hf,
-                                 scale_mul=cfg.grass_mid_scale, mask=self.grass_mask)
-        near_pending = self.near.compute_pending(x, z, radius=self.near_mesh_radius)
-        clump_scatter = None
-        if self.clumps_near is not None:
-            clump_scatter = world_grid_scatter(
-                x, z, self.clump_radius + CLUMP_STREAM_MARGIN, cfg.clump_density,
-                self.hf, scale_mul=cfg.clump_scale, mask=self.grass_mask)
-        return mid, near_pending, clump_scatter
+    @grass_far_radius.setter
+    def grass_far_radius(self, metres: float) -> None:
+        self.cover.far_radius = float(metres)
 
-    def apply_near(self, payload: tuple[Any, Any, Any]) -> None:
+    def compute_near(self, x: float, z: float) -> tuple[Any, Any]:
+        """Scatter the near field at ``(x, z)``: the cover and the near tree meshes.
+
+        Both halves are pure numpy, so a worker thread runs this and the render
+        thread takes the result through :meth:`apply_near`."""
+        return self.cover.compute_near(x, z), self.near.compute_pending(
+            x, z, radius=self.near_mesh_radius)
+
+    def apply_near(self, payload: tuple[Any, Any]) -> None:
         """Stage a :meth:`compute_near` result on the GL thread."""
-        mid, near_pending, clump_scatter = payload
-        self.grass.update_instances(*mid)
+        cover, near_pending = payload
+        self.cover.apply_near(cover)
         self.near._pending = near_pending      # uploaded by the node's next render
-        if clump_scatter is not None:
-            self._clump_cache = clump_scatter
-            self._clump_lod_center = None      # new cache: force a re-selection
 
     def update_clump_lod(self, x: float, z: float) -> None:
-        """Re-select the drawn clump subsets from the cache against camera ``(x, z)``.
+        """Re-centre the drawn cover geometry on the live camera. Every frame.
 
-        The coarse base draws every clump within ``clump_radius`` and the full-detail
-        node the subset within ``R1``, both measured from the live camera -- so the
-        disc tracks the walk exactly and its leading edge fades in through the LOD
-        band instead of snapping up in density when a restream recentres it. Cheap
-        (two distance masks + an instance upload); runs on the GL thread each frame."""
-        cache = self._clump_cache
-        if (cache is None or self.clumps_near is None
-                or self.clumps_far is None):
-            return
-        c = self._clump_lod_center
-        if c is not None and abs(x - c[0]) + abs(z - c[1]) < 0.05:
-            return                                         # camera held still: disc unchanged
-        self._clump_lod_center = (x, z)
-        p, y, s = cache
-        d2 = (p[:, 0] - x) ** 2 + (p[:, 2] - z) ** 2
-        r = self.clump_radius
-        far = d2 < r * r                                   # coarse base: the whole disc
-        r1 = r * CLUMP_LOD_FRAC
-        near = d2 < r1 * r1                                # full-detail overlay out to R1
-        self.clumps_far.update_instances(p[far], y[far], s[far])
-        self.clumps_near.update_instances(p[near], y[near], s[near])
+        Cheap -- distance masks over a cached scatter -- and what keeps the disc
+        from lagging the walk; see
+        :meth:`~OpenGLContext.scenegraph.vegetation.cover.GroundCover.select`."""
+        self.cover.select(x, z)
 
     def stream_near(self, x: float, z: float) -> None:
         """Restream the near field synchronously (first fill / quality change)."""
@@ -240,16 +176,15 @@ class ForestScene:
         self.update_clump_lod(x, z)
 
     def compute_far(self, x: float, z: float) -> Any:
-        """Scatter the coarse far-grass disc that follows the camera to the horizon."""
-        return world_grid_scatter(x, z, self.grass_far_radius, self.config.grass_far_density,
-                                  self.hf, scale_mul=FAR_GRASS_SCALE_MUL, mask=self.grass_mask)
+        """Scatter the coarse cover disc that follows the camera to the horizon."""
+        return self.cover.compute_far(x, z)
 
     def apply_far(self, payload: Any) -> None:
         """Stage a :meth:`compute_far` result on the GL thread."""
-        self.grass_far.update_instances(*payload)
+        self.cover.apply_far(payload)
 
     def stream_far(self, x: float, z: float) -> None:
-        """Restream the far-grass disc synchronously."""
+        """Restream the far cover disc synchronously."""
         self.apply_far(self.compute_far(x, z))
 
     def compute_impostors(self, x: float, z: float, fx: float,
@@ -412,52 +347,27 @@ def build_forest_scene(config: ForestConfig) -> ForestScene:
     print(f"forest: {N} trees ({fir_only.sum()} fir + {noel.sum()} noel pine conifers, "
           f"{maple.sum()} maple, {realistic.sum()} realistic) — all with near-mesh LOD")
 
-    # Grass LOD chain (all camera-following, streamed as the viewer moves):
-    #   near  = real-geometry clumps 0->R, dither-dissolving out at the disc edge;
-    #   mid   = impostor billboards baked from the clump, fading IN at R (near_cut)
-    #           exactly where the clumps fade out, out to 95m;
-    #   far   = coarse sparse impostor billboards 90->R_far.
-    # Mid/far use the clump-baked impostor (grass_clump_imp.png) so their colour
-    # matches the clumps and the geometry->billboard handoff is invisible. Falls
-    # back to the legacy grass.png if the impostor hasn't been baked.
-    clump_radius = config.clump_radius
-    # The far grass disc's outer edge follows the camera; against open ground its
-    # fade band reads as a "carpet growing in" as you walk. Pushing the radius out
-    # puts that edge far away (smaller on screen, fade band ~15% of the radius so it
-    # widens with it) where perspective + fog hide it.
-    grass_far_radius = config.grass_far_radius
-    imp = "grass_clump_imp.png" if os.path.exists(A("grass_clump_imp.png")) else "grass.png"
-    # grass billboards use a low flat sun term (config.grass_sun) so they match the
-    # dark, per-fragment-lit clump geometry rather than reading as bright neon lumps.
-    gsun = config.grass_sun
-    grass = InstancedBillboards(np.zeros((0, 3), 'f4'), np.zeros(0, 'f4'), np.zeros(0, 'f4'),
-                                A(imp), width=GRASS_BILLBOARD_WIDTH, far_fade=MID_GRASS_FADE,
-                                near_cut=clump_radius, sun_level=gsun)
-    grass_far = InstancedBillboards(np.zeros((0, 3), 'f4'), np.zeros(0, 'f4'), np.zeros(0, 'f4'),
-                                    A(imp), width=GRASS_BILLBOARD_WIDTH, far_fade=grass_far_radius,
-                                    near_cut=FAR_GRASS_NEAR_CUT, sun_level=gsun)
+    # What grows between the trees. The engine owns the whole distance chain --
+    # two geometry rungs, the cards that replace them, and the coarse field out
+    # to the haze -- so what is decided here is only what grows (the baked
+    # species set), where it may (the mask), how dark it is under the canopy
+    # (the terrain's shading) and how much tree stands over it (the terrain's
+    # closure, which is what puts the shrubs in the gaps and along the edges).
+    cover = GroundCover(
+        hf, cover_species(), clump_radius=config.clump_radius,
+        card_radius=config.grass_card_radius,
+        far_radius=config.grass_far_radius,
+        mask=grass_mask, shade=terrain_geom.shade,
+        canopy=terrain_geom.canopy_cover, sun=COVER_SUN)
+    cover.density_scale = config.cover_density
+    kinds = sorted({one.name.rsplit('_', 1)[0] for one in cover.species})
+    print(f"ground cover: {len(cover.species)} kinds — {', '.join(kinds)}")
 
-    # near-field real-geometry grass clumps, geometry-LOD in two nodes: full detail
-    # within R1 = CLUMP_LOD_FRAC*R, a coarser mesh from R1 out to R (where the mid
-    # billboards fade in). Most of the disc area is beyond R1, so the coarse set
-    # carries most instances at a fraction of the per-clump vertex cost. Bundled as a
-    # package asset; if it is missing the demo simply runs without near clumps.
-    clumps_near = clumps_far = None
-    if os.path.exists(CLUMP_GLB):
-        cP, cN, cUV, cIdx, cTex = load_clump_glb(CLUMP_GLB, length_samples=config.clump_length_samples)
-        fP, fN, fUV, fIdx, _ = load_clump_glb(CLUMP_GLB, length_samples=config.clump_far_length_samples)
-        clumps_near = InstancedClumps(cP, cN, cUV, cIdx, cTex, sun=CLUMP_SUN)
-        clumps_far = InstancedClumps(fP, fN, fUV, fIdx, cTex, sun=CLUMP_SUN)
-        print(f"grass clumps: {len(cIdx) // 3} tris/clump near, {len(fIdx) // 3} far, "
-              f"from {os.path.basename(CLUMP_GLB)}")
-
-    clump_nodes = [_shape(clumps_near), _shape(clumps_far)] if clumps_near is not None else []
-    bb_grass = [_shape(grass_far), _shape(grass)]
     sg = sceneGraph(children=[
         Background(skyColor=[[0.28, 0.46, 0.72], [0.52, 0.66, 0.82], [0.80, 0.87, 0.93]],
                    skyAngle=[1.15, 1.5708],
                    groundColor=[[0.68, 0.76, 0.80], [0.62, 0.70, 0.74]], groundAngle=[1.5708]),
-        terrain] + bb_grass + clump_nodes + tree_nodes)
+        terrain, cover] + tree_nodes)
 
     # collider: the cylinder must sit on the *visible* trunk, not the mesh origin.
     # Some models put the trunk off-centre (buttress roots, lean), so we measure each
@@ -471,13 +381,22 @@ def build_forest_scene(config: ForestConfig) -> ForestScene:
     collider_pos = np.stack([col_x, tp[:, 1], col_z], 1).astype(np.float32)
     collider_radius = np.clip(metrics[near_id, 2] * heights, 0.15, 0.55).astype(np.float32)
 
-    scene = ForestScene(
+    return ForestScene(
         config=config, sceneGraph=sg, hf=hf, terrain_geom=terrain_geom, near=near,
-        impostors=impostors, grass=grass, grass_far=grass_far,
-        clumps_near=clumps_near, clumps_far=clumps_far,
-        grass_mask=grass_mask, clump_radius=clump_radius, grass_far_radius=grass_far_radius,
+        impostors=impostors, cover=cover, grass_mask=grass_mask,
         impostor_cos=impostor_cos, near_mesh_radius=config.near_mesh_radius,
         collider_pos=collider_pos, collider_radius=collider_radius,
         near_species=near_species, spawn=(ex, ez))
-    scene.retune_clumps()   # set the LOD fade/cut windows from clump_radius
-    return scene
+
+
+def cover_species() -> list[CoverSpecies]:
+    """What grows between the trees, read from the baked art.
+
+    A set rather than one plant: grass, fern, nettle, periwinkle and shrub, each
+    at its own density and its own size. ``cover.json`` is written by
+    ``oglc-bake-plants`` beside the models it names, so adding a plant to the
+    forest is a re-bake rather than an edit here.
+    """
+    with open(COVER, encoding="utf-8") as handle:
+        named = json.load(handle)["species"]
+    return [CoverSpecies.from_json(entry).beside(ASSETS) for entry in named]

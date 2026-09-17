@@ -37,17 +37,15 @@ class ForestConfig:
     tree_scale_min: float = 0.75  # smallest per-tree scale multiplier
     tree_scale_max: float = 1.45  # largest per-tree scale multiplier
 
-    # --- grass ---
-    clump_radius: float = 30.0        # real-geometry grass-clump disc radius, metres
-    grass_far_radius: float = 700.0   # coarse far-grass disc radius, metres
-    grass_mid_density: float = 3.5    # mid grass billboards per m^2
-    clump_density: float = 9.0        # real grass clumps per m^2
-    clump_scale: float = 0.42         # grass-clump scale multiplier
-    clump_length_samples: int = 4     # blade-length subdivisions baked per near clump
-    clump_far_length_samples: int = 1  # coarse blade subdivisions for the distance-LOD far clumps
-    grass_sun: float = 0.36           # flat sun term for grass billboards (matches clumps)
-    grass_mid_scale: float = 0.42     # mid grass billboard scale multiplier
-    grass_far_density: float = 0.09   # far grass billboards per m^2
+    # --- ground cover ---
+    # How much of each plant there is, and how tall it stands, is the baked
+    # species set's (see `scene.cover_species`): a fern is not as dense as a
+    # grass and neither is as tall as a shrub. What is here is the reach of each
+    # rung of the distance chain, and one multiplier over the whole field.
+    clump_radius: float = 30.0        # real-geometry cover disc radius, metres
+    grass_card_radius: float = 95.0   # cover cards reach, where the geometry stops, metres
+    grass_far_radius: float = 700.0   # coarse far-cover disc radius, metres
+    cover_density: float = 1.0        # multiplier on every species' own density
 
     # --- LOD ---
     impostor_cone_deg: float = 75.0   # forward view-cone half-angle for impostor culling, degrees
@@ -105,28 +103,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
     tr.add_argument("--tree-scale-max", dest="tree_scale_max", type=float, default=d.tree_scale_max,
                     help="largest per-tree scale multiplier")
 
-    g = p.add_argument_group("grass")
+    g = p.add_argument_group("ground cover")
     g.add_argument("--clump-radius", dest="clump_radius", type=float, default=d.clump_radius,
-                   help="real-geometry grass-clump disc radius (m)")
+                   help="real-geometry cover disc radius (m)")
+    g.add_argument("--grass-card-radius", dest="grass_card_radius", type=float,
+                   default=d.grass_card_radius,
+                   help="how far the cover cards reach past the geometry (m)")
     g.add_argument("--grass-far-radius", dest="grass_far_radius", type=float, default=d.grass_far_radius,
-                   help="coarse far-grass disc radius (m)")
-    g.add_argument("--grass-mid-density", dest="grass_mid_density", type=float, default=d.grass_mid_density,
-                   help="mid grass billboards per m^2")
-    g.add_argument("--clump-density", dest="clump_density", type=float, default=d.clump_density,
-                   help="real grass clumps per m^2")
-    g.add_argument("--clump-scale", dest="clump_scale", type=float, default=d.clump_scale,
-                   help="grass-clump scale multiplier")
-    g.add_argument("--clump-length-samples", dest="clump_length_samples", type=int,
-                   default=d.clump_length_samples, help="blade-length subdivisions baked per near clump")
-    g.add_argument("--clump-far-length-samples", dest="clump_far_length_samples", type=int,
-                   default=d.clump_far_length_samples,
-                   help="coarse blade subdivisions for the distance-LOD far clumps")
-    g.add_argument("--grass-sun", dest="grass_sun", type=float, default=d.grass_sun,
-                   help="flat sun term for grass billboards (matches the clump geometry)")
-    g.add_argument("--grass-mid-scale", dest="grass_mid_scale", type=float, default=d.grass_mid_scale,
-                   help="mid grass billboard scale multiplier")
-    g.add_argument("--grass-far-density", dest="grass_far_density", type=float, default=d.grass_far_density,
-                   help="far grass billboards per m^2")
+                   help="coarse far-cover disc radius (m)")
+    g.add_argument("--cover-density", dest="cover_density", type=float, default=d.cover_density,
+                   help="multiplier on every cover species' own density")
 
     lod = p.add_argument_group("LOD")
     lod.add_argument("--impostor-cone-deg", "--impostor-cone", dest="impostor_cone_deg", type=float,

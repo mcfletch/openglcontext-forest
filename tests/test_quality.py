@@ -5,31 +5,28 @@
 windows, and :class:`AutoQuality` measures once and picks the highest rung that holds
 target by scaling the measurement by each rung's ``cost_weight``.
 """
-import types
 from itertools import pairwise
 
-import numpy as np
-
 from openglcontext_forest_demo import quality as q
-from openglcontext_forest_demo import scene as sc
 from openglcontext_forest_demo.config import ForestConfig
 
 
 def test_high_preset_matches_shipped_defaults():
     d = ForestConfig()
     h = q.PRESETS["high"]
-    assert (h.clump_density, h.clump_radius, h.grass_mid_density,
-            h.grass_far_radius, h.grass_far_density, h.near_mesh_radius) == (
-        d.clump_density, d.clump_radius, d.grass_mid_density,
-        d.grass_far_radius, d.grass_far_density, d.near_mesh_radius)
+    assert (h.cover_density, h.clump_radius, h.grass_card_radius,
+            h.grass_far_radius, h.near_mesh_radius) == (
+        d.cover_density, d.clump_radius, d.grass_card_radius,
+        d.grass_far_radius, d.near_mesh_radius)
 
 
 def test_ladder_is_ordered_cheapest_first_by_every_lever():
     rungs = [q.PRESETS[n] for n in q.LADDER]
     for a, b in pairwise(rungs):               # each rung fuller (and pricier) than the last
         assert a.cost_weight < b.cost_weight
-        assert a.clump_density <= b.clump_density
+        assert a.cover_density <= b.cover_density
         assert a.clump_radius <= b.clump_radius
+        assert a.grass_card_radius <= b.grass_card_radius
     assert q.LADDER[0] == "low" and q.LADDER[-1] == "high"
     assert q.PRESETS["high"].cost_weight == 1.0
 
@@ -124,136 +121,51 @@ class _Node:
         self.committed += 1
 
 
+class _Cover:
+    """Stands in for the engine's GroundCover, which needs art and a context."""
+
+    def __init__(self):
+        self.density_scale = 1.0
+        self.clump_radius = self.card_radius = self.far_radius = 0.0
+        self.retuned = 0
+
+    def retune(self):
+        self.retuned += 1
+
+
 class _Scene:
     def __init__(self):
         self.config = ForestConfig()
-        self.grass = _Node()
-        self.grass_far = _Node()
-        self.clump_radius = self.grass_far_radius = self.near_mesh_radius = 0.0
-        self.retuned = 0
-
-    def retune_clumps(self):
-        self.retuned += 1
+        self.cover = _Cover()
+        self.near_mesh_radius = 0.0
 
 
 def test_apply_to_scene_sets_live_knobs_and_retunes():
     s = _Scene()
     p = q.PRESETS["low"]
     q.apply_to_scene(s, p)
-    assert s.config.clump_density == p.clump_density
-    assert s.config.grass_mid_density == p.grass_mid_density
-    assert s.config.grass_far_density == p.grass_far_density
-    assert s.clump_radius == p.clump_radius
-    assert s.grass_far_radius == p.grass_far_radius
+    assert s.config.cover_density == p.cover_density
+    assert s.config.clump_radius == p.clump_radius
+    assert s.config.grass_card_radius == p.grass_card_radius
+    assert s.config.grass_far_radius == p.grass_far_radius
     assert s.near_mesh_radius == p.near_mesh_radius
-    assert s.retuned == 1                       # clump LOD windows follow clump_radius
-    assert s.grass.near_cut == p.clump_radius
-    assert s.grass_far.far_fade == p.grass_far_radius
-    assert s.grass.committed == s.grass_far.committed == 1
+    assert s.cover.density_scale == p.cover_density
+    assert s.cover.clump_radius == p.clump_radius
+    assert s.cover.card_radius == p.grass_card_radius
+    assert s.cover.far_radius == p.grass_far_radius
+    # Every rung's fade window was set from the radii the last preset had.
+    assert s.cover.retuned == 1
 
 
-def test_apply_to_scene_skips_grass_commit_before_gl_init():
-    s = _Scene()
-    for node in (s.grass, s.grass_far):
-        node._gl = None
-    q.apply_to_scene(s, q.PRESETS["medium"])
-    assert s.grass.committed == 0
-    assert s.grass.near_cut == q.PRESETS["medium"].clump_radius   # value still set
+def test_every_rung_of_the_chain_moves_together():
+    """A preset that moved the geometry disc and left the cards where they were
+    would open a ring of bare ground between the two."""
+    for name in q.LADDER:
+        p = q.PRESETS[name]
+        assert p.clump_radius < p.grass_card_radius < p.grass_far_radius
 
 
-def test_retune_clumps_sets_near_and_far_lod_windows():
-    near, far = _Node(), _Node()
-    ns = types.SimpleNamespace(clumps_near=near, clumps_far=far, clump_radius=30.0)
-    sc.ForestScene.retune_clumps(ns)
-    r1 = 30.0 * sc.CLUMP_LOD_FRAC
-    assert near.fade_end == r1 and near.fade_start == r1 * sc.CLUMP_FADE_FRAC   # overlay fades out at R1
-    assert far.cut_start == 0.0 and far.cut_end == 0.0        # full coarse base: no inner cut
-    assert far.fade_end == 30.0 and far.fade_start == 30.0 * sc.CLUMP_FADE_FRAC
-    assert near.committed == far.committed == 1
-
-
-def test_retune_clumps_is_a_noop_without_clumps():
-    sc.ForestScene.retune_clumps(types.SimpleNamespace(clumps_near=None, clump_radius=30.0))
-
-
-# --- update_clump_lod: the per-frame camera-relative disc re-selection ----------
-# The clump scatter is cached over a disc wider than the draw radius; each frame the
-# drawn near/far subsets are re-picked from it against the *live* camera, so the disc
-# tracks the walk with no streaming lag (what read as the mid-distance clumps popping
-# up in density when a lagged disc recentred).
-
-class _InstNode:
-    def __init__(self):
-        self.pos = None
-        self.updates = 0
-
-    def update_instances(self, p, y, s):
-        self.pos = p
-        self.updates += 1
-
-
-def _clump_grid(half=45.0, step=0.5):
-    xs = np.arange(-half, half, step)
-    gx, gz = np.meshgrid(xs, xs)
-    p = np.stack([gx.ravel(), np.zeros(gx.size), gz.ravel()], 1).astype("f4")
-    z = np.zeros(len(p), "f4")
-    return (p, z, z + 1.0)
-
-
-def _scene_with_cache():
-    near, far = _InstNode(), _InstNode()
-    ns = types.SimpleNamespace(clumps_near=near, clumps_far=far, clump_radius=30.0,
-                               _clump_cache=_clump_grid(), _clump_lod_center=None)
-    return ns, near, far
-
-
-def test_update_clump_lod_selects_the_live_camera_disc():
-    ns, near, far = _scene_with_cache()
-    sc.ForestScene.update_clump_lod(ns, 0.0, 5.0)          # camera at (0, 5)
-    dfar = np.hypot(far.pos[:, 0], far.pos[:, 2] - 5.0)
-    dnear = np.hypot(near.pos[:, 0], near.pos[:, 2] - 5.0)
-    assert dfar.max() <= 30.0                              # coarse base = whole disc
-    assert dnear.max() <= 30.0 * sc.CLUMP_LOD_FRAC         # full overlay = out to R1
-    assert len(near.pos) < len(far.pos)                    # overlay is a subset
-
-
-def test_update_clump_lod_tracks_camera_without_a_density_jump():
-    # Walking small steps, the clumps in the forward mid-distance band (where the pop
-    # showed) stay ~constant: the disc follows the camera continuously instead of
-    # lagging and snapping forward at a stream boundary.
-    ns, _near, far = _scene_with_cache()
-    bands = []
-    for z in np.arange(0.0, 12.0, 0.6):                    # across two former 10 m boundaries
-        sc.ForestScene.update_clump_lod(ns, 0.0, float(z))
-        ahead = far.pos[:, 2] - z
-        bands.append(int(((ahead > 20.0) & (ahead < 30.0)).sum()))
-    bands = np.array(bands)
-    # frame-to-frame change stays a small fraction of the band; a lagged disc would
-    # drop this near zero then jump back to full at each boundary.
-    assert np.abs(np.diff(bands)).max() < 0.15 * bands.mean()
-
-
-def test_update_clump_lod_skips_reselection_while_the_camera_holds_still():
-    ns, _near, far = _scene_with_cache()
-    sc.ForestScene.update_clump_lod(ns, 0.0, 0.0)
-    sc.ForestScene.update_clump_lod(ns, 0.0, 0.0)          # unmoved: no second select
-    sc.ForestScene.update_clump_lod(ns, 0.01, 0.0)         # sub-threshold jitter: still skipped
-    assert far.updates == 1
-    sc.ForestScene.update_clump_lod(ns, 5.0, 0.0)          # a real move re-selects
-    assert far.updates == 2
-
-
-def test_update_clump_lod_is_a_noop_without_clumps_or_cache():
-    sc.ForestScene.update_clump_lod(               # no clump nodes at all
-        types.SimpleNamespace(clumps_near=None, _clump_cache=None, clump_radius=30.0), 0.0, 0.0)
-    ns, _near, far = _scene_with_cache()
-    ns._clump_cache = None                         # nodes present, nothing cached yet
-    sc.ForestScene.update_clump_lod(ns, 0.0, 0.0)
-    assert far.pos is None
-
-
-def test_apply_to_scene_delegates_clump_windows_to_the_scene():
-    s = _Scene()
-    q.apply_to_scene(s, q.PRESETS["low"])         # must not touch clump nodes directly
-    assert s.retuned == 1
-    assert s.grass.near_cut == q.PRESETS["low"].clump_radius
+# The geometry level-of-detail and the per-frame re-centring it used to do here
+# are the engine's now (`OpenGLContext.scenegraph.vegetation.cover`), and are
+# covered by `tests/unit/test_ground_cover_species.py` there. What is left here
+# is what this demo decides: which preset moves which knob.

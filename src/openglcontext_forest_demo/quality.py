@@ -1,10 +1,10 @@
 """Render-quality presets and the auto-quality picker for the forest demo.
 
-The forest's frame cost on an integrated GPU is dominated by the near-field grass:
-the real-geometry clumps are ~13M tris/frame at the shipped density, ~70% of GPU
-time on an Intel UHD 630 (profiled). Every knob that moves it — clump density and
-disc radius, the mid/far grass billboard density and follow-radius, and the
-near-mesh follow radius — is read fresh at *stream* time from the live
+The forest's frame cost on an integrated GPU is dominated by the near-field ground
+cover: the real-geometry rung is millions of triangles a frame at the shipped
+density, ~70% of GPU time on an Intel UHD 630 (profiled). Every knob that moves it
+— how much cover there is and how far each rung of its distance chain reaches, plus
+the near-mesh follow radius — is read fresh at *stream* time from the live
 `ForestConfig`/`ForestScene`, so a preset can be applied to a running scene without
 rebuilding the 230k-tree world. `apply_to_scene` does exactly that and keeps the
 LOD cross-fade windows consistent with the new radii.
@@ -31,13 +31,16 @@ from openglcontext_forest_demo.config import ForestConfig
 
 @dataclass(frozen=True)
 class QualityPreset:
-    """A named set of the live grass/LOD knobs that drive integrated-GPU frame cost."""
+    """A named set of the live cover/LOD knobs that drive integrated-GPU frame cost."""
     name: str
-    clump_density: float       # real grass clumps per m^2 (dominant GPU lever)
-    clump_radius: float        # real-clump follow-disc radius, metres
-    grass_mid_density: float   # mid grass billboards per m^2
-    grass_far_radius: float    # coarse far-grass follow-disc radius, metres
-    grass_far_density: float   # far grass billboards per m^2
+    #: Multiplier on every cover species' own density -- the dominant GPU lever.
+    #: A multiplier rather than a figure because the field is several kinds of
+    #: plant at several densities: less cover means less of all of it, in
+    #: proportion, not a different set of plants on a slower machine.
+    cover_density: float
+    clump_radius: float        # real-geometry cover disc radius, metres
+    grass_card_radius: float   # how far the cover cards reach past it, metres
+    grass_far_radius: float    # coarse far-cover follow-disc radius, metres
     near_mesh_radius: float    # radius the near-mesh trees follow the camera, metres
     #: GPU cost of this preset relative to ``high`` (=1.0). Used by the auto picker to
     #: estimate a level's frame time from a measurement taken at another level, so it
@@ -57,25 +60,25 @@ _D = ForestConfig()   # shipped defaults define the `high` preset so the two nev
 #: per-pixel), but windowed `high` holds, so the weights only matter fill-bound.
 PRESETS = {
     "high": QualityPreset(
-        "high", clump_density=_D.clump_density, clump_radius=_D.clump_radius,
-        grass_mid_density=_D.grass_mid_density, grass_far_radius=_D.grass_far_radius,
-        grass_far_density=_D.grass_far_density, near_mesh_radius=_D.near_mesh_radius,
+        "high", cover_density=_D.cover_density, clump_radius=_D.clump_radius,
+        grass_card_radius=_D.grass_card_radius,
+        grass_far_radius=_D.grass_far_radius, near_mesh_radius=_D.near_mesh_radius,
         cost_weight=1.0),
     "medhigh": QualityPreset(
-        "medhigh", clump_density=6.0, clump_radius=24.0, grass_mid_density=3.0,
-        grass_far_radius=540.0, grass_far_density=0.08, near_mesh_radius=53.0,
+        "medhigh", cover_density=0.67, clump_radius=24.0, grass_card_radius=86.0,
+        grass_far_radius=540.0, near_mesh_radius=53.0,
         cost_weight=0.78),
     "medium": QualityPreset(
-        "medium", clump_density=4.0, clump_radius=18.0, grass_mid_density=2.5,
-        grass_far_radius=400.0, grass_far_density=0.07, near_mesh_radius=50.0,
+        "medium", cover_density=0.44, clump_radius=18.0, grass_card_radius=71.0,
+        grass_far_radius=400.0, near_mesh_radius=50.0,
         cost_weight=0.67),
     "medlow": QualityPreset(
-        "medlow", clump_density=3.0, clump_radius=15.0, grass_mid_density=2.0,
-        grass_far_radius=330.0, grass_far_density=0.06, near_mesh_radius=46.0,
+        "medlow", cover_density=0.33, clump_radius=15.0, grass_card_radius=57.0,
+        grass_far_radius=330.0, near_mesh_radius=46.0,
         cost_weight=0.64),
     "low": QualityPreset(
-        "low", clump_density=2.0, clump_radius=12.0, grass_mid_density=1.5,
-        grass_far_radius=260.0, grass_far_density=0.05, near_mesh_radius=42.0,
+        "low", cover_density=0.22, clump_radius=12.0, grass_card_radius=43.0,
+        grass_far_radius=260.0, near_mesh_radius=42.0,
         cost_weight=0.53),
 }
 
@@ -97,28 +100,22 @@ def apply_to_scene(scene: Any, preset: QualityPreset) -> None:
     node uniforms); the caller restreams at the current camera position afterwards.
     """
     cfg = scene.config
-    cfg.clump_density = preset.clump_density
-    cfg.grass_mid_density = preset.grass_mid_density
-    cfg.grass_far_density = preset.grass_far_density
-    scene.clump_radius = preset.clump_radius
-    scene.grass_far_radius = preset.grass_far_radius
+    cfg.cover_density = preset.cover_density
+    cfg.clump_radius = preset.clump_radius
+    cfg.grass_card_radius = preset.grass_card_radius
+    cfg.grass_far_radius = preset.grass_far_radius
     scene.near_mesh_radius = preset.near_mesh_radius
 
-    # Keep the cross-fade windows consistent with the new radii. Each node sends
-    # these as constants at GL init, so re-commit to push the new values; guard on
-    # _gl so this is a no-op before first render (the fresh values upload then).
-    def recommit(node: Any) -> None:
-        if node is not None and getattr(node, "_gl", None) is not None:
-            node._commit_constants()
-
-    # clump LOD fade/cut windows (both nodes) follow clump_radius
-    scene.retune_clumps()
-    # mid grass billboards fade IN exactly where the clumps fade out
-    scene.grass.near_cut = preset.clump_radius
-    recommit(scene.grass)
-    # far grass billboards dissolve at their follow-disc edge
-    scene.grass_far.far_fade = preset.grass_far_radius
-    recommit(scene.grass_far)
+    cover = scene.cover
+    cover.density_scale = preset.cover_density
+    cover.clump_radius = preset.clump_radius
+    cover.card_radius = preset.grass_card_radius
+    cover.far_radius = preset.grass_far_radius
+    # Every rung's fade window was set from the radii the last preset had, and a
+    # window left where those put it is a seam at the new distance. `retune` is
+    # what puts them back, and re-sends them: a node uploads them as constants at
+    # GL init, so nothing else would.
+    cover.retune()
 
 
 class AutoQuality:

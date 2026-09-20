@@ -155,3 +155,22 @@ python tools/bake_assets.py --no-impostors      # geometry + textures only (no G
 The bake reproduces the shipped mesh geometry exactly (unit height, base at y=0, XZ
 centroid at origin); impostors are re-rendered front-on. This is the reproducible
 provenance chain behind `ASSET-LICENSES.md`.
+
+## Releasing the art
+
+The art is 66 MB and does not travel in the wheel: it is a **content pack**,
+attached to a GitHub release and fetched by
+[`OpenGLContext.contentpacks`](https://github.com/mcfletch/openglcontext/blob/main/docs/contentpacks.html)
+before the first frame. One command builds it, writes the registry from what it
+built, and publishes it:
+
+```bash
+./release-assets.py                 # build the archive, write packs.json
+./release-assets.py --install       # ...and install it in this machine's store
+./release-assets.py --push          # ...and attach it to the release tag
+```
+
+`--install` is how a content release is driven before it is a release: the demo
+finds the pack in its own store and runs as an installed copy would, with
+nothing published. `OPENGLCONTEXT_CONTENT` points a packaged, offline or CI run
+at a directory of packs instead.

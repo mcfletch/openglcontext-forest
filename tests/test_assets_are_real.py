@@ -4,18 +4,11 @@
 *pointers* unless it is told `lfs: true`, and a pointer is a 132-byte text file
 that keeps the name and the extension of the thing it stands for. A tree built
 from such a checkout looks right -- every file present, every path resolving --
-and the demo dies on its first image with `UnidentifiedImageError`.
+and the demo stops at its first image with `UnidentifiedImageError`.
 
-That is exactly what shipped: 57 of 57 assets in the published
-`openglcontext-forest-demo` were pointers, 232 KB of text where 66 MB of art
-belongs. Nothing caught it, because nothing had ever asked whether a file that
-is *there* is also what it claims to be.
-
-The art is a content pack now, so a wheel no longer carries it -- but a *pack*
-built from a pointer tree would be the same failure with an extra step, and
-would carry a digest saying it was fine. So this guards what the pack is built
-from. `tools/release_content.py` refuses on the same rule before it writes an
-archive.
+The content pack is built from this tree, so these tests check that every file
+in it is what its name says. `release-assets.py` refuses pointers on the same
+rule, through the engine's archive writer, before it writes an archive.
 """
 
 import os

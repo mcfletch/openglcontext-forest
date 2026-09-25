@@ -53,15 +53,12 @@ where = ["src"]
 [tool.setuptools.dynamic]
 version = { attr = "openglcontext_forest_demo.__version__" }
 
-# Bundle the runtime geometry/textures/heightmaps the demo loads. The large source
-# .glb models they were baked from live in ../assets-source and are NOT shipped in
-# the wheel (they are provenance, documented in ASSET-LICENSES.md).
+# The large source .glb models the art was baked from live in ../assets-source
+# and are not shipped (they are provenance, documented in ASSET-LICENSES.md).
 [tool.setuptools.package-data]
 # Not `assets/*`. 66 MB of terrain, trees and impostors is not something an
-# index should be asked to serve, and the art that did travel here reached PyPI
-# as 57 Git LFS pointers -- 232 KB of text wearing the right names, which no
-# amount of packaging care makes into art. It is a content pack now, fetched on
-# a first run; `packs.json` is the 1 KB that says where from.
+# index should be asked to serve: it is a content pack, fetched on a first run
+# (release-assets.py builds it), and `packs.json` says where from.
 openglcontext_forest_demo = ["packs.json", "CREDITS.txt"]
 
 # Lint standard: the OpenGLContext engine's E/W/F/B base, plus import-order, pyupgrade

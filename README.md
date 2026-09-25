@@ -165,13 +165,22 @@ before the first frame. One command builds it, writes the registry from what it
 built, and publishes it:
 
 ```bash
-./release-assets.py                 # build the archive, write packs.json
-./release-assets.py --install       # ...and install it in this machine's store
-./release-assets.py --reinstall     # ...over whatever that store already holds
-./release-assets.py --push          # ...and attach it to the release tag
+./release-assets.py                   # build the archive and its registry
+./release-assets.py --install         # ...and install it in this machine's store
+./release-assets.py --reinstall       # ...replacing the copy installed there
+./release-assets.py --write-registry  # ...and write the shipped packs.json
+./release-assets.py --push            # ...attach it to the release tag, and
+                                      #    write the shipped packs.json
 ```
 
-`--install` is how a content release is driven before it is a release: the demo
-finds the pack in its own store and runs as an installed copy would, with
-nothing published. It leaves a pack already in the store where it is; `--reinstall` does the same over whatever the store already holds, which is what a rebuilt world needs to be the one that opens. `OPENGLCONTEXT_CONTENT` points a packaged, offline or CI run
-at a directory of packs instead.
+The archive and a registry describing it go to `dist/content/`; the
+`packs.json` the wheel ships is rewritten only by `--write-registry` or
+`--push`, so a trial build never changes what an install fetches. `--install`
+is how a content release is driven before it is a release: the demo finds the
+pack in its own store and runs as an installed copy would, with nothing
+published. `--install` keeps a pack that is already installed; `--reinstall`
+replaces it with the one just built. `OPENGLCONTEXT_CONTENT` points a packaged,
+offline or CI run at a directory of packs instead.
+
+The art is in Git LFS, so build from a checkout with the objects fetched
+(`git lfs pull`); the archive writer refuses a tree holding LFS pointers.

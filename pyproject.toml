@@ -64,6 +64,12 @@ openglcontext_forest_demo = ["packs.json", "CREDITS.txt"]
 # Lint standard: the OpenGLContext engine's E/W/F/B base, plus import-order, pyupgrade
 # and blind-except checks, so this new package ships without the usual first-release
 # lint drift. Documented, deliberate exceptions only.
+[tool.openglcontext-checks]
+# The OGC rules (openglcontext-checks) this project is clean of, held by
+# the workspace preflight. The others join as the project reaches zero of
+# each; the counts are in openglcontext/plans/DEFECT-PREVENTION.md.
+select = ["OGC131", "OGC141", "OGC201", "OGC223"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"

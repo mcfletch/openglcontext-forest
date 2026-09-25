@@ -33,7 +33,7 @@ def test_request_computes_off_thread_and_drain_applies():
 
 
 def test_drain_returns_false_when_nothing_pending():
-    s = AsyncStreamer(lambda: 0, lambda v: None, "test")
+    s = AsyncStreamer(lambda: 0, lambda _payload: None, "test")
     try:
         assert s.drain() is False
     finally:
@@ -85,7 +85,8 @@ def test_worker_survives_a_failing_compute():
 
 
 def test_stop_is_idempotent_and_joins():
-    s = AsyncStreamer(lambda: 0, lambda v: None, "test")
+    s = AsyncStreamer(lambda: 0, lambda _payload: None, "test")
+    assert s.running
     s.stop()
     s.stop()                       # second stop must not hang or raise
-    assert not s._thread.is_alive()
+    assert not s.running

@@ -9,8 +9,10 @@ over the copy in the wheel while there is one.
 import os
 
 import pytest
+from OpenGLContext import userpaths
+from OpenGLContext.loaders import resolver
 
-from openglcontext_forest_demo import content
+from openglcontext_forest_demo import content, run, scene
 
 
 @pytest.fixture
@@ -44,7 +46,6 @@ class TestTheRegistry:
         assert content.registry()[0].approximate_bytes > 10 * 1024 * 1024
 
     def test_its_marker_is_the_first_thing_the_scene_opens(self) -> None:
-        from openglcontext_forest_demo import scene
         assert content.registry()[0].marker == os.path.basename(scene.HEIGHTMAP)
 
 
@@ -83,7 +84,6 @@ class TestAPackFetchedAfterImport:
 
     def test_the_cover_is_read_from_the_pack(self, tmp_path,
                                              monkeypatch) -> None:
-        from openglcontext_forest_demo import scene
         pack = content.registry()[0]
         root = tmp_path / "local" / content.NAMESPACE / pack.directory
         root.mkdir(parents=True)
@@ -103,14 +103,12 @@ class TestTheFirstRunOnTheConsole:
 
     @pytest.fixture
     def nothing_here(self, tmp_path, monkeypatch):
-        from OpenGLContext import userpaths
-        from OpenGLContext.loaders import resolver
         monkeypatch.setattr(userpaths, "appdatadirectory",
                             lambda: str(tmp_path / "appdata"))
         monkeypatch.delenv("OPENGLCONTEXT_CONTENT", raising=False)
         fetched = []
 
-        def offline(url, *args, **named):
+        def offline(url, *_args, **_named):
             fetched.append(url)
             raise OSError("no route to host")
         monkeypatch.setattr(resolver, "fetch_to_cache", offline)
@@ -118,8 +116,7 @@ class TestTheFirstRunOnTheConsole:
 
     def test_the_player_is_asked_and_no_fetches_nothing(
             self, nothing_here, monkeypatch, capsys) -> None:
-        from openglcontext_forest_demo import run
-        monkeypatch.setattr("builtins.input", lambda prompt: "n")
+        monkeypatch.setattr("builtins.input", lambda _prompt: "n")
         with pytest.raises(SystemExit) as stopped:
             run.fetch_art()
         assert nothing_here == []
@@ -129,8 +126,7 @@ class TestTheFirstRunOnTheConsole:
 
     def test_a_failed_download_is_explained_rather_than_a_traceback(
             self, nothing_here, monkeypatch) -> None:
-        from openglcontext_forest_demo import run
-        monkeypatch.setattr("builtins.input", lambda prompt: "y")
+        monkeypatch.setattr("builtins.input", lambda _prompt: "y")
         with pytest.raises(SystemExit) as stopped:
             run.fetch_art()
         assert nothing_here, "it tried"
@@ -140,9 +136,7 @@ class TestTheFirstRunOnTheConsole:
 
     def test_yes_on_the_command_line_does_not_ask(
             self, nothing_here, monkeypatch) -> None:
-        from openglcontext_forest_demo import run
-
-        def never(prompt):
+        def never(_prompt):
             raise AssertionError("asked")
         monkeypatch.setattr("builtins.input", never)
         with pytest.raises(SystemExit):

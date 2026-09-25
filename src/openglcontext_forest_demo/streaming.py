@@ -73,6 +73,11 @@ class AsyncStreamer:
             self._cv.notify()
         self._thread.join(timeout=2.0)
 
+    @property
+    def running(self) -> bool:
+        """Whether the worker thread is alive; :meth:`stop` ends it."""
+        return self._thread.is_alive()
+
     def _run(self) -> None:
         while True:
             with self._cv:

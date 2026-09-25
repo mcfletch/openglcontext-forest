@@ -17,6 +17,7 @@ import ctypes
 import os
 import sys
 
+import glfw
 import numpy as np
 from OpenGL.GL import *
 from OpenGL.GL.shaders import compileProgram, compileShader
@@ -30,8 +31,9 @@ DEFAULT_OUT = os.path.join(HERE, "..", "src", "openglcontext_forest_demo", "asse
 
 
 def bake(glb, out, size=512):
-    import glfw
-    from OpenGLContext.scenegraph.vegetation import load_clump_glb
+    from OpenGLContext.scenegraph.vegetation import (  # noqa: PLC0415 after sys.path above names the checkout's openglcontext
+        load_clump_glb,
+    )
 
     P, _N, UV, idx, texpath = load_clump_glb(glb)          # height-normalised to 1.0
     hx = float(np.max(np.abs(P[:, 0])))                    # front-view half-width

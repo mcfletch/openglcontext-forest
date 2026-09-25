@@ -62,6 +62,8 @@ from typing import Any
 os.environ.setdefault("OPENGLCONTEXT_RENDERER", "pbr")
 os.environ.setdefault("OPENGLCONTEXT_BACKEND", "glfw")
 from OpenGLContext import quaternion, testingcontext
+from OpenGLContext.contentpacks import application
+from OpenGLContext.contentpacks.store import CONTENT_OVERRIDE
 from OpenGLContext.contextdefinition import ContextDefinition
 from OpenGLContext.move import modes as movemodes
 from OpenGLContext.move.terrainwalk import TerrainWalkMixin
@@ -70,7 +72,7 @@ from OpenGLContext.ui.overlay import OverlayMixin
 
 BaseContext = testingcontext.getInteractive()
 
-from openglcontext_forest_demo import menu
+from openglcontext_forest_demo import content, menu
 from openglcontext_forest_demo import quality as qual
 from openglcontext_forest_demo.config import (
     ForestConfig,
@@ -250,7 +252,7 @@ class Forest(OverlayMixin, TerrainWalkMixin,
         self._far_stream.request(x, z)
         self._request_impostors(x, z)
 
-    def cycleQuality(self, event: Any = None) -> None:
+    def cycleQuality(self, event: Any = None) -> None:  # noqa: ARG002 an event handler: a key binding passes the event
         """F8: step low -> medium -> high -> low.  A manual pick freezes auto."""
         self._auto = None
         self._auto_mode = False        # a hand pick wins; stop re-measuring on resize
@@ -345,7 +347,7 @@ class Forest(OverlayMixin, TerrainWalkMixin,
         """
         return self.showMenu(event)
 
-    def showMenu(self, event: Any = None) -> Any:
+    def showMenu(self, event: Any = None) -> Any:  # noqa: ARG002 an event handler: a key binding passes the event
         """Raise the menu, or bring up the one already showing."""
         existing = self.overlays.named(menu.MENU_NAME)
         if existing is not None:
@@ -364,28 +366,28 @@ class Forest(OverlayMixin, TerrainWalkMixin,
         return (f"{len(self.scene.collider_pos)} trees over "
                 f"{cfg.extent / 1000.0:.1f} km of Great Smoky Mountains elevation")
 
-    def closeMenu(self, event: Any = None) -> None:
+    def closeMenu(self, event: Any = None) -> None:  # noqa: ARG002 an event handler: a key binding passes the event
         """Put the menu away, leaving the forest showing."""
         panel = self.overlays.named(menu.MENU_NAME)
         if panel is not None and not panel.closed:
             panel.close(True)
 
-    def showSettings(self, event: Any = None) -> Any:
+    def showSettings(self, event: Any = None) -> Any:  # noqa: ARG002 an event handler: a key binding passes the event
         """Raise the shared settings screen (F10)."""
         return settings.open_settings(self)
 
-    def showBindings(self, event: Any = None) -> Any:
+    def showBindings(self, event: Any = None) -> Any:  # noqa: ARG002 an event handler: a key binding passes the event
         """Raise the shared key-bindings screen (F6)."""
         return bindings.open_bindings(self)
 
-    def showCredits(self, event: Any = None) -> Any:
+    def showCredits(self, event: Any = None) -> Any:  # noqa: ARG002 an event handler: a key binding passes the event
         """Raise the asset attribution the tree models are licensed on."""
         existing = self.overlays.named(menu.CREDITS_NAME)
         if existing is not None:
             return existing
         return self.pushOverlay(menu.credits_screen(credits_text()))
 
-    def cycleMovementMode(self, event: Any = None) -> Any:
+    def cycleMovementMode(self, event: Any = None) -> Any:  # noqa: ARG002 an event handler: a key binding passes the event
         """Step to the next declared movement mode, as ``m`` does in twitch."""
         navigation = self.getNavigation()
         return navigation.cycle() if navigation is not None else None
@@ -471,10 +473,6 @@ def fetch_art(assume_yes: bool = False) -> None:
     fails, stops the program with a message saying what happened and how to
     run from a local copy of the art instead.
     """
-    from OpenGLContext.contentpacks import application
-    from OpenGLContext.contentpacks.store import CONTENT_OVERRIDE
-
-    from openglcontext_forest_demo import content
     offline = (f"To run from a copy of the art you already have, point "
                f"{CONTENT_OVERRIDE} at a directory holding "
                f"{content.NAMESPACE}/art.")

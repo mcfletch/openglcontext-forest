@@ -11,6 +11,7 @@ from typing import ClassVar
 os.environ.setdefault("OPENGLCONTEXT_BACKEND","glfw")
 os.environ["OPENGLCONTEXT_DISABLE_FPS_DISPLAY"]="1"
 import numpy as np
+import OpenGL.GL as gl
 
 from openglcontext_forest_demo import run as demo  # needs `pip install -e .`
 
@@ -21,7 +22,6 @@ class Bench(demo.Forest):
     def OnDraw(self, *a, **k):
         t0=time.perf_counter()
         r=super().OnDraw(*a,**k)
-        import OpenGL.GL as gl
         gl.glFinish()
         self._t.append(time.perf_counter()-t0); self._n+=1
         if self._n>=160:
@@ -34,7 +34,7 @@ class Bench(demo.Forest):
             sys.stdout.flush()   # os._exit skips the buffers: piped, the numbers vanish
             os._exit(0)
         return r
-    def OnIdle(self,*a):
+    def OnIdle(self,*_a):
         # auto-walk forward so the benchmark reflects motion (streaming/redraw cost)
         if self.platform is not None:
             self._walk+=0.6

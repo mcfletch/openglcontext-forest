@@ -14,10 +14,12 @@ import time
 
 os.environ.setdefault("OPENGLCONTEXT_BACKEND", "glfw")
 os.environ["OPENGLCONTEXT_DISABLE_FPS_DISPLAY"] = "1"
+import glfw
 import numpy as np
 import OpenGL.GL as gl
 
 from openglcontext_forest_demo import run as demo
+from openglcontext_forest_demo.config import config_from_args
 
 FRAMES = int(os.environ.get("PB_FRAMES", "220"))
 WARM = 30
@@ -31,7 +33,7 @@ class PB(demo.Forest):
         # Subsystem disable for GPU attribution: make chosen nodes no-op draws.
         def kill(node):
             if node is not None:
-                node._disabled = True
+                node._disabled = True  # noqa: SLF001 the vegetation and terrain nodes have no public switch to skip their draw
         if "grass" in DISABLE:
             kill(sc.grass); kill(sc.grass_far)
         if "clumps" in DISABLE:
@@ -53,7 +55,7 @@ class PB(demo.Forest):
         self._t_idle = 0.0
         return r
 
-    def OnIdle(self, *a):
+    def OnIdle(self, *_a):
         t0 = time.perf_counter()
         if self.platform is not None:
             self._walk += 0.6
@@ -67,7 +69,6 @@ class PB(demo.Forest):
     def OnDraw(self, *a, **k):
         if os.environ.get("PB_FULLSCREEN") == "1" and not getattr(self, "_fs", False) \
                 and getattr(self, "window", None) is not None:
-            import glfw
             self._fs = True
             mon = glfw.get_primary_monitor()
             if mon:
@@ -120,7 +121,6 @@ class PB(demo.Forest):
 
 
 if __name__ == "__main__":
-    from openglcontext_forest_demo.config import config_from_args
     if os.environ.get("PB_SIZE"):        # e.g. PB_SIZE=1920x1080 to measure fill scaling
         w, h = os.environ["PB_SIZE"].split("x")
         demo.WINDOW_SIZE = (int(w), int(h))

@@ -5,6 +5,7 @@ the reusable scene API imports and the parser accepts an empty argv. A synthetic
 `build_forest_scene` smoke build is attempted but skipped if assets/deps make it
 impossible — it must never require a real GL context."""
 import dataclasses
+import os
 
 import pytest
 
@@ -13,6 +14,13 @@ from openglcontext_forest_demo.config import (
     ForestConfig,
     build_arg_parser,
     config_from_args,
+)
+from openglcontext_forest_demo.content import art_directory
+from openglcontext_forest_demo.scene import (
+    CONTROL,
+    HEIGHTMAP,
+    ForestScene,
+    build_forest_scene,
 )
 
 
@@ -91,17 +99,6 @@ def test_build_forest_scene_smoke():
 
     build_forest_scene only makes scenegraph nodes + numpy data (GL uploads lazily on
     render), so this must run with no context. A small tree_radius keeps it fast."""
-    import os
-    try:
-        from openglcontext_forest_demo.content import art_directory
-        from openglcontext_forest_demo.scene import (
-            CONTROL,
-            HEIGHTMAP,
-            ForestScene,
-            build_forest_scene,
-        )
-    except Exception as exc:  # noqa: BLE001 -- any import-time GL/deps problem -> skip
-        pytest.skip(f"scene import unavailable: {exc!r}")
     art = art_directory()
     if not (os.path.exists(os.path.join(art, HEIGHTMAP))
             and os.path.exists(os.path.join(art, CONTROL))):

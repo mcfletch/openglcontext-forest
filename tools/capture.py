@@ -35,7 +35,7 @@ class Cap(demo.Forest):
             self._shots.append((wx, wz))
         return r
 
-    def OnIdle(self, *a):
+    def OnIdle(self, *_a):
         if self.platform is None:
             return
         wx, wz = self._shots[self._i]

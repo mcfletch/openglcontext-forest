@@ -8,7 +8,7 @@ target by scaling the measurement by each rung's ``cost_weight``.
 from itertools import pairwise
 
 from openglcontext_forest_demo import quality as q
-from openglcontext_forest_demo.config import ForestConfig
+from openglcontext_forest_demo.config import ForestConfig, config_from_args
 
 
 def test_high_preset_matches_shipped_defaults():
@@ -49,7 +49,6 @@ def test_f8_cycle_visits_every_rung():
 def test_every_rung_is_selectable():
     # No hidden rung: every ladder rung (plus auto) is a --quality/F8 choice, and the
     # command line actually accepts each (catches config<->quality drift).
-    from openglcontext_forest_demo.config import config_from_args
     assert set(q.CHOICES) == {"auto", *q.LADDER}
     for name in q.CHOICES:
         assert config_from_args(["--quality", name]).quality == name

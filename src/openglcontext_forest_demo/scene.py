@@ -36,6 +36,7 @@ from OpenGLContext.scenegraph.vegetation import (
     InstancedBillboards,
     InstancedMeshLOD,
 )
+from PIL import Image
 
 from openglcontext_forest_demo import content
 from openglcontext_forest_demo.config import ForestConfig
@@ -154,7 +155,7 @@ class ForestScene:
         """Stage a :meth:`compute_near` result on the GL thread."""
         cover, near_pending = payload
         self.cover.apply_near(cover)
-        self.near._pending = near_pending      # uploaded by the node's next render
+        self.near._pending = near_pending  # noqa: SLF001 InstancedMeshLOD has no public call to stage a computed near set; uploaded by its next render
 
     def update_clump_lod(self, x: float, z: float) -> None:
         """Re-centre the drawn cover geometry on the live camera. Every frame.
@@ -238,7 +239,6 @@ def build_forest_scene(config: ForestConfig,
     # scatter is thinned by (1 - rock weight) from the control map, so it stays lush
     # where you walk yet vanishes on bare mountainsides instead of dotting them with
     # green blobs. Reuses the HeightField sampler to read the map over the extent.
-    from PIL import Image
     _ctl = np.asarray(Image.open(A(CONTROL)).convert("RGBA").resize((config.res, config.res), Image.Resampling.LANCZOS),
                       np.float32) / 255.0
     _grass_allowed = np.clip(1.0 - _ctl[..., LAYERS.index("rock")], 0.0, 1.0)

@@ -95,6 +95,9 @@ select = [
     "S202",    # tar extraction is filtered
     "S301",    # no pickle loading
     "S310",    # urlopen is given a checked scheme
+    "PLC0415", # imports at the top of the module, a lazy one saying why
+    "SLF001",  # no reaching into another object's private names
+    "ARG",     # no unused arguments
 ]
 ignore = [
     "E501",  # line too long -- kept readable by hand, not hard-wrapped (as in the engine)

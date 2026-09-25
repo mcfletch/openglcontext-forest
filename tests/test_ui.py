@@ -6,9 +6,11 @@ one does, which keys open what, and that the demo starts in mouse-look -- is
 checked here rather than against a window.
 """
 import pathlib
+from types import SimpleNamespace
 
 import pytest
 from OpenGLContext.move import modes as movemodes
+from OpenGLContext.screenshot import ScreenshotMixin
 
 from openglcontext_forest_demo import menu, run
 from openglcontext_forest_demo.config import ForestConfig
@@ -88,10 +90,6 @@ def test_the_screenshot_key_is_the_one_every_context_has():
 
 def test_the_shot_is_named_for_the_demo():
     """The window title names the file, so a picture folder says which took it."""
-    from types import SimpleNamespace
-
-    from OpenGLContext.screenshot import ScreenshotMixin
-
     named = ScreenshotMixin()
     named.contextDefinition = SimpleNamespace(title=menu.TITLE)
     assert 'forest' in named.screenshotTitle()

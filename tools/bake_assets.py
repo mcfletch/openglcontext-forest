@@ -29,6 +29,7 @@ Usage (from the demo project root, with the package importable)::
 Requires: trimesh (glb parsing), numpy, pillow; glfw + PyOpenGL for --impostors.
 """
 import argparse
+import ctypes
 import os
 import sys
 
@@ -79,7 +80,7 @@ for i, (out, br, lf) in enumerate(_REAL):
 
 def _world_part(scene, names):
     """Merge named glTF nodes into world-space (P, N, U, I) arrays."""
-    import trimesh
+    import trimesh  # noqa: PLC0415 trimesh is an undeclared dependency only this tool needs
     P = []; N = []; U = []; I = []; base = 0
     for name in names:
         T, gname = scene.graph[name]
@@ -127,11 +128,9 @@ def bake_geometry(scene, spec, out_dir):
     return {"verts": len(oP) + len(fP), "h": h}
 
 
-def bake_impostor(scene, spec, out_dir, size=512):
+def bake_impostor(spec, out_dir, size=512):
     """Render a front-on orthographic RGBA billboard of the tree to <impostor>.png."""
-    import ctypes
-
-    from OpenGL.GL import (
+    from OpenGL.GL import (  # noqa: PLC0415 GL is needed only for impostors; --no-impostors runs without it
         GL_ARRAY_BUFFER,
         GL_BLEND,
         GL_CLAMP_TO_EDGE,
@@ -194,7 +193,10 @@ def bake_impostor(scene, spec, out_dir, size=512):
         glVertexAttribPointer,
         glViewport,
     )
-    from OpenGL.GL.shaders import compileProgram, compileShader
+    from OpenGL.GL.shaders import (  # noqa: PLC0415 GL is needed only for impostors; --no-impostors runs without it
+        compileProgram,
+        compileShader,
+    )
 
     d = np.load(os.path.join(out_dir, spec["out"] + ".npz"))
     ok, fk = spec["okey"], spec["fkey"]
@@ -262,12 +264,12 @@ def main(argv=None):
     ap.add_argument("--no-impostors", action="store_true", help="skip the GL impostor bake")
     args = ap.parse_args(argv)
 
-    import trimesh
+    import trimesh  # noqa: PLC0415 trimesh is an undeclared dependency only this tool needs
     os.makedirs(args.out, exist_ok=True)
     specs = [s for s in SPECIES if not args.only or s["out"] in args.only]
 
     if not args.no_impostors:
-        import glfw
+        import glfw  # noqa: PLC0415 glfw is needed only for impostors; --no-impostors runs without it
         if not glfw.init():
             raise SystemExit("glfw init failed (needed for impostors; use --no-impostors)")
         glfw.window_hint(glfw.VISIBLE, glfw.FALSE)
@@ -283,7 +285,7 @@ def main(argv=None):
         m = bake_geometry(scenes[spec["glb"]], spec, args.out)
         msg = f"  {spec['out']:<8} verts={m['verts']:<7}"
         if not args.no_impostors:
-            bake_impostor(scenes[spec["glb"]], spec, args.out); msg += " +impostor"
+            bake_impostor(spec, args.out); msg += " +impostor"
         print(msg); sys.stdout.flush()
     print(f"baked {len(specs)} species -> {args.out}")
 

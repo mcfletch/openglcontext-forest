@@ -86,6 +86,15 @@ select = [
     "S110", # no silent try/except/pass
     "PGH003", "PGH004",  # a type: ignore or noqa names the codes it silences
     "PLE0604", "PLE0605",  # __all__ is a list or tuple of strings
+    "RUF100",  # every noqa silences something
+    "RUF012",  # a mutable class attribute is annotated ClassVar
+    "S112",    # no silent try/except/continue
+    "TRY400",  # an error logged from an except handler carries its traceback
+    "DTZ",     # datetimes carry a timezone
+    "S102", "S307",  # no exec or eval
+    "S202",    # tar extraction is filtered
+    "S301",    # no pickle loading
+    "S310",    # urlopen is given a checked scheme
 ]
 ignore = [
     "E501",  # line too long -- kept readable by hand, not hard-wrapped (as in the engine)

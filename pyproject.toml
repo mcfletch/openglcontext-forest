@@ -127,7 +127,7 @@ ignore = [
 "os.rename".msg = "os.rename refuses an existing target on Windows; use os.replace, or OpenGLContext.atomicfiles"
 "os.environ".msg = "read a switch once, through OpenGLContext.renderoptions.env_flag_once / env_number_once, or in the program's start-up"
 "os.getenv".msg = "read a switch once, through OpenGLContext.renderoptions.env_flag_once / env_number_once, or in the program's start-up"
-"os._exit".msg = "exit through OpenGLContext.testing.process_exit.flush_and_exit, which flushes what was written first"
+"os._exit".msg = "exit through OpenGLContext.processexit.flush_and_exit, which flushes what was written first"
 "time.time".msg = "ask OpenGLContext.events.systemtime.systemTime(), which a capture's fixed-step clock drives"
 
 [tool.ruff.lint.per-file-ignores]

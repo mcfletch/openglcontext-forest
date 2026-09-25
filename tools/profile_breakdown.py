@@ -30,10 +30,10 @@ class PB(demo.Forest):
     def OnInit(self):
         r = super().OnInit()
         sc = self.scene
-        # Subsystem disable for GPU attribution: make chosen nodes no-op draws.
+        # Subsystem disable for GPU attribution: the chosen nodes are not drawn.
         def kill(node):
             if node is not None:
-                node._disabled = True  # noqa: SLF001 the vegetation and terrain nodes have no public switch to skip their draw
+                node.drawn = False
         if "grass" in DISABLE:
             kill(sc.grass); kill(sc.grass_far)
         if "clumps" in DISABLE:

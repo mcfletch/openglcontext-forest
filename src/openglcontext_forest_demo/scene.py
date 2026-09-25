@@ -155,7 +155,7 @@ class ForestScene:
         """Stage a :meth:`compute_near` result on the GL thread."""
         cover, near_pending = payload
         self.cover.apply_near(cover)
-        self.near._pending = near_pending  # noqa: SLF001 InstancedMeshLOD has no public call to stage a computed near set; uploaded by its next render
+        self.near.stage(near_pending)
 
     def update_clump_lod(self, x: float, z: float) -> None:
         """Re-centre the drawn cover geometry on the live camera. Every frame.

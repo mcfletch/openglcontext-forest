@@ -8,6 +8,7 @@ covers the whole of that:
 
     ./release-assets.py                 # build the archive, write the registry
     ./release-assets.py --install       # ...and put it in this machine's store
+    ./release-assets.py --reinstall     # ...over whatever that store already holds
     ./release-assets.py --push          # ...and attach it to the release tag
 
 ``--install`` is what makes a content release testable before it is a release:
@@ -107,8 +108,12 @@ def credits() -> str:
             "this demo. Full attribution in CREDITS.txt inside the pack.")
 
 
-def install(into: str) -> int:
+def install(into: str, replace: bool = False) -> int:
     """Put what was built into the store the demo reads, and say where.
+
+    ``replace`` throws away what is installed under each key first, which is
+    what a second build of a world wants: the store holds the last one, and an
+    install that leaves it there shows the world before the change.
 
     Through the demo's own :mod:`~openglcontext_forest_demo.content`, so what
     is installed is what it will look for -- the registry it ships, the
@@ -124,7 +129,8 @@ def install(into: str) -> int:
         # As a download does: the choice, and whatever it is incomplete
         # without, into the chosen pack's own directory.
         for pack in catalog.with_needed(chosen, packs):
-            where = publish.install(pack, store, into, within=chosen)
+            where = publish.install(pack, store, into, within=chosen,
+                                    replace=replace)
             print(f"  {pack.key:<28} {os.path.relpath(where, store.root)}")
     return 0
 
@@ -151,6 +157,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="install what was built into this machine's own "
                              "store, so the demo runs against it with nothing "
                              "published")
+    parser.add_argument("--reinstall", action="store_true",
+                        help="install, throwing away what is already in the "
+                             "store under this key first, which is what a "
+                             "rebuilt world needs to be the one that opens")
     parser.add_argument("--push", action="store_true",
                         help="attach the archives to the release at --tag, "
                              "creating it if it is not there yet (needs the "
@@ -171,8 +181,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"forest art: {size / 1048576:.1f} MB, sha256 {sha[:12]}, "
           f"registry written to {os.path.relpath(CATALOG, HERE)}")
 
-    if options.install:
-        install(options.into)
+    if options.install or options.reinstall:
+        install(options.into, replace=options.reinstall)
     if options.push:
         return push(options.tag, [path])
     return 0

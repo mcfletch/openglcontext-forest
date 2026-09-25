@@ -167,10 +167,11 @@ built, and publishes it:
 ```bash
 ./release-assets.py                 # build the archive, write packs.json
 ./release-assets.py --install       # ...and install it in this machine's store
+./release-assets.py --reinstall     # ...over whatever that store already holds
 ./release-assets.py --push          # ...and attach it to the release tag
 ```
 
 `--install` is how a content release is driven before it is a release: the demo
 finds the pack in its own store and runs as an installed copy would, with
-nothing published. `OPENGLCONTEXT_CONTENT` points a packaged, offline or CI run
+nothing published. It leaves a pack already in the store where it is; `--reinstall` does the same over whatever the store already holds, which is what a rebuilt world needs to be the one that opens. `OPENGLCONTEXT_CONTENT` points a packaged, offline or CI run
 at a directory of packs instead.

@@ -93,6 +93,7 @@ def test_build_forest_scene_smoke():
     render), so this must run with no context. A small tree_radius keeps it fast."""
     import os
     try:
+        from openglcontext_forest_demo.content import art_directory
         from openglcontext_forest_demo.scene import (
             CONTROL,
             HEIGHTMAP,
@@ -101,7 +102,9 @@ def test_build_forest_scene_smoke():
         )
     except Exception as exc:  # noqa: BLE001 -- any import-time GL/deps problem -> skip
         pytest.skip(f"scene import unavailable: {exc!r}")
-    if not (os.path.exists(HEIGHTMAP) and os.path.exists(CONTROL)):
+    art = art_directory()
+    if not (os.path.exists(os.path.join(art, HEIGHTMAP))
+            and os.path.exists(os.path.join(art, CONTROL))):
         pytest.skip("terrain assets not bundled")
     cfg = ForestConfig(res=129, tree_radius=60.0, grass_far_radius=80.0)
     try:

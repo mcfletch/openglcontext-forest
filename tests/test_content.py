@@ -72,3 +72,26 @@ class TestWhatAFirstRunNeeds:
         with open(os.path.join(root, pack.marker), "wb") as handle:
             handle.write(b"\x89PNG\r\n\x1a\n")
         return root
+
+
+class TestAPackFetchedAfterImport:
+    """A first run imports the scene before the art is here, then fetches it.
+
+    Whatever the scene opens is read from where the art is when it is opened,
+    not from where it was when the module was imported.
+    """
+
+    def test_the_cover_is_read_from_the_pack(self, tmp_path,
+                                             monkeypatch) -> None:
+        from openglcontext_forest_demo import scene
+        pack = content.registry()[0]
+        root = tmp_path / "local" / content.NAMESPACE / pack.directory
+        root.mkdir(parents=True)
+        (root / pack.marker).write_bytes(b"\x89PNG\r\n\x1a\n")
+        (root / "cover.json").write_text(
+            '{"species": [{"name": "only_one", "card": "card.png"}]}',
+            encoding="utf-8")
+        monkeypatch.setenv("OPENGLCONTEXT_CONTENT", str(tmp_path / "local"))
+        species = scene.cover_species()
+        assert [one.name for one in species] == ["only_one"]
+        assert species[0].card == str(root / "card.png")

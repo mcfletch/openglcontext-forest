@@ -40,17 +40,16 @@ from OpenGLContext.scenegraph.vegetation import (
 from openglcontext_forest_demo import content
 from openglcontext_forest_demo.config import ForestConfig
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-#: Where the art is. The base pack once it has been fetched, the copy in the
-#: wheel until then -- see :mod:`openglcontext_forest_demo.content`.
-ASSETS = content.art_directory()
-HEIGHTMAP = os.path.join(ASSETS, "forest_height.png")
-CONTROL = os.path.join(ASSETS, "forest_control.png")
+#: The files the scene opens, by name within the art. Where the art is comes
+#: from :func:`openglcontext_forest_demo.content.art_directory` when a scene is
+#: built, since a first run imports this module before the art has arrived.
+HEIGHTMAP = "forest_height.png"
+CONTROL = "forest_control.png"
 #: What grows between the trees, and how much of each there is. Baked from CC0
 #: scans by ``oglc-bake-plants``; see ASSET-LICENSES.md. The set is read from
 #: the art rather than listed here, so re-baking it with another plant in it
 #: needs no code change.
-COVER = os.path.join(ASSETS, "cover.json")
+COVER = "cover.json"
 LAYERS = ["forest_floor", "grass", "rock", "moss"]
 
 # Fixed handoff geometry that keeps the LOD cross-fades seamless — not user knobs:
@@ -65,11 +64,6 @@ COVER_SUN = (-0.5, -0.72, -0.48)
 # Per-species trunk-base sink so root flares/buttresses embed (fir flare, real3 buttress).
 # Indexed by near-mesh species id (0 fir, 1 noel, 2-5 maple, 6-12 realistic).
 SINK = np.array([0.10, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.17, 0.02, 0.02, 0.02], np.float32)
-
-
-def A(name: str) -> str:
-    """Path to a bundled demo asset."""
-    return os.path.join(ASSETS, name)
 
 
 def _shape(geometry: Any) -> Shape:
@@ -220,15 +214,24 @@ class ForestScene:
         self.apply_impostors(self.compute_impostors(x, z, fx, fz))
 
 
-def build_forest_scene(config: ForestConfig) -> ForestScene:
+def build_forest_scene(config: ForestConfig,
+                       art: str | None = None) -> ForestScene:
     """Build the terrain + instanced forest + grass LOD chain from `config`.
 
     Creates scenegraph nodes and numpy instance data only (GL uploads on first
     render), so call this inside a GL context's `OnInit`. Returns a `ForestScene`
-    the caller renders and streams; the concrete navigation lives on top."""
-    hf = HeightField.from_image(HEIGHTMAP, config.res, config.extent, config.relief)
+    the caller renders and streams; the concrete navigation lives on top.
+
+    ``art`` is the directory the art is read from, by default wherever
+    :func:`~openglcontext_forest_demo.content.art_directory` finds it now."""
+    art = art if art is not None else content.art_directory()
+
+    def A(name: str) -> str:
+        return os.path.join(art, name)
+
+    hf = HeightField.from_image(A(HEIGHTMAP), config.res, config.extent, config.relief)
     hfn = hf.sample
-    terrain_geom = SplatTerrain(hf, LAYERS, CONTROL)
+    terrain_geom = SplatTerrain(hf, LAYERS, A(CONTROL))
     terrain = _shape(terrain_geom)
 
     # Grass grows on any soft ground (forest floor, meadow, moss) but NOT on rock:
@@ -236,7 +239,7 @@ def build_forest_scene(config: ForestConfig) -> ForestScene:
     # where you walk yet vanishes on bare mountainsides instead of dotting them with
     # green blobs. Reuses the HeightField sampler to read the map over the extent.
     from PIL import Image
-    _ctl = np.asarray(Image.open(CONTROL).convert("RGBA").resize((config.res, config.res), Image.Resampling.LANCZOS),
+    _ctl = np.asarray(Image.open(A(CONTROL)).convert("RGBA").resize((config.res, config.res), Image.Resampling.LANCZOS),
                       np.float32) / 255.0
     _grass_allowed = np.clip(1.0 - _ctl[..., LAYERS.index("rock")], 0.0, 1.0)
     _rock_mask = HeightField(_grass_allowed, config.extent, 1.0).sample
@@ -354,7 +357,7 @@ def build_forest_scene(config: ForestConfig) -> ForestScene:
     # (the terrain's shading) and how much tree stands over it (the terrain's
     # closure, which is what puts the shrubs in the gaps and along the edges).
     cover = GroundCover(
-        hf, cover_species(), clump_radius=config.clump_radius,
+        hf, cover_species(art), clump_radius=config.clump_radius,
         card_radius=config.grass_card_radius,
         far_radius=config.grass_far_radius,
         mask=grass_mask, shade=terrain_geom.shade,
@@ -389,14 +392,16 @@ def build_forest_scene(config: ForestConfig) -> ForestScene:
         near_species=near_species, spawn=(ex, ez))
 
 
-def cover_species() -> list[CoverSpecies]:
-    """What grows between the trees, read from the baked art.
+def cover_species(art: str | None = None) -> list[CoverSpecies]:
+    """What grows between the trees, read from the baked art in ``art``.
 
     A set rather than one plant: grass, fern, nettle, periwinkle and shrub, each
     at its own density and its own size. ``cover.json`` is written by
     ``oglc-bake-plants`` beside the models it names, so adding a plant to the
-    forest is a re-bake rather than an edit here.
+    forest is a re-bake rather than an edit here. ``art`` defaults to wherever
+    :func:`~openglcontext_forest_demo.content.art_directory` finds the art now.
     """
-    with open(COVER, encoding="utf-8") as handle:
+    art = art if art is not None else content.art_directory()
+    with open(os.path.join(art, COVER), encoding="utf-8") as handle:
         named = json.load(handle)["species"]
-    return [CoverSpecies.from_json(entry).beside(ASSETS) for entry in named]
+    return [CoverSpecies.from_json(entry).beside(art) for entry in named]

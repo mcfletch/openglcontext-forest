@@ -13,7 +13,6 @@ exact same world this way.
 """
 from __future__ import annotations
 
-import json
 import math
 import os
 from collections.abc import Callable
@@ -36,6 +35,7 @@ from OpenGLContext.scenegraph.vegetation import (
     InstancedBillboards,
     InstancedMeshLOD,
 )
+from OpenGLContext.scenegraph.vegetation.cover import COVER_MANIFEST, read_cover_manifest
 from PIL import Image
 
 from openglcontext_forest_demo import content
@@ -50,7 +50,7 @@ CONTROL = "forest_control.png"
 #: scans by ``oglc-bake-plants``; see ASSET-LICENSES.md. The set is read from
 #: the art rather than listed here, so re-baking it with another plant in it
 #: needs no code change.
-COVER = "cover.json"
+COVER = COVER_MANIFEST
 LAYERS = ["forest_floor", "grass", "rock", "moss"]
 
 # Fixed handoff geometry that keeps the LOD cross-fades seamless — not user knobs:
@@ -402,6 +402,4 @@ def cover_species(art: str | None = None) -> list[CoverSpecies]:
     :func:`~openglcontext_forest_demo.content.art_directory` finds the art now.
     """
     art = art if art is not None else content.art_directory()
-    with open(os.path.join(art, COVER), encoding="utf-8") as handle:
-        named = json.load(handle)["species"]
-    return [CoverSpecies.from_json(entry).beside(art) for entry in named]
+    return read_cover_manifest(art)

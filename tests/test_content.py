@@ -95,3 +95,56 @@ class TestAPackFetchedAfterImport:
         species = scene.cover_species()
         assert [one.name for one in species] == ["only_one"]
         assert species[0].card == str(root / "card.png")
+
+
+class TestTheFirstRunOnTheConsole:
+    """The art is fetched before the window opens, so the console is where the
+    player is asked, and where a failure is explained."""
+
+    @pytest.fixture
+    def nothing_here(self, tmp_path, monkeypatch):
+        from OpenGLContext import userpaths
+        from OpenGLContext.loaders import resolver
+        monkeypatch.setattr(userpaths, "appdatadirectory",
+                            lambda: str(tmp_path / "appdata"))
+        monkeypatch.delenv("OPENGLCONTEXT_CONTENT", raising=False)
+        fetched = []
+
+        def offline(url, *args, **named):
+            fetched.append(url)
+            raise OSError("no route to host")
+        monkeypatch.setattr(resolver, "fetch_to_cache", offline)
+        return fetched
+
+    def test_the_player_is_asked_and_no_fetches_nothing(
+            self, nothing_here, monkeypatch, capsys) -> None:
+        from openglcontext_forest_demo import run
+        monkeypatch.setattr("builtins.input", lambda prompt: "n")
+        with pytest.raises(SystemExit) as stopped:
+            run.fetch_art()
+        assert nothing_here == []
+        assert "OPENGLCONTEXT_CONTENT" in str(stopped.value)
+        said = capsys.readouterr().out
+        assert "Forest demo art" in said and "CC-BY" in said
+
+    def test_a_failed_download_is_explained_rather_than_a_traceback(
+            self, nothing_here, monkeypatch) -> None:
+        from openglcontext_forest_demo import run
+        monkeypatch.setattr("builtins.input", lambda prompt: "y")
+        with pytest.raises(SystemExit) as stopped:
+            run.fetch_art()
+        assert nothing_here, "it tried"
+        message = str(stopped.value)
+        assert "no route to host" in message
+        assert "OPENGLCONTEXT_CONTENT" in message
+
+    def test_yes_on_the_command_line_does_not_ask(
+            self, nothing_here, monkeypatch) -> None:
+        from openglcontext_forest_demo import run
+
+        def never(prompt):
+            raise AssertionError("asked")
+        monkeypatch.setattr("builtins.input", never)
+        with pytest.raises(SystemExit):
+            run.fetch_art(assume_yes=True)
+        assert nothing_here, "it went ahead"

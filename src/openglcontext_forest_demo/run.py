@@ -57,7 +57,6 @@ import os
 import pathlib
 import sys
 import time
-from collections.abc import Callable
 from typing import Any
 
 os.environ.setdefault("OPENGLCONTEXT_RENDERER", "pbr")
@@ -73,7 +72,11 @@ BaseContext = testingcontext.getInteractive()
 
 from openglcontext_forest_demo import menu
 from openglcontext_forest_demo import quality as qual
-from openglcontext_forest_demo.config import ForestConfig, config_from_args
+from openglcontext_forest_demo.config import (
+    ForestConfig,
+    build_arg_parser,
+    config_from_namespace,
+)
 from openglcontext_forest_demo.scene import build_forest_scene
 from openglcontext_forest_demo.streaming import AsyncStreamer
 
@@ -458,51 +461,42 @@ def print_controls() -> None:
     sys.stdout.flush()
 
 
-def _reporter() -> "Callable[[int, int | None], None]":
-    """A progress callback that prints every five per cent and no more.
-
-    Its own function rather than a closure inside the loop: a callback made in
-    a loop and handed to something that outlives the iteration is a trap, and
-    one that prints every chunk of a 59 MB download is a screenful of noise.
-    """
-    shown = [-1]
-
-    def progress(done: int, total: "int | None") -> None:
-        if not total:
-            return
-        at = int(done * 100 / total)
-        if at >= shown[0] + 5:
-            shown[0] = at
-            print(f"\r  {at:3d}%", end="")
-            sys.stdout.flush()
-    return progress
-
-
-def fetch_art() -> None:
+def fetch_art(assume_yes: bool = False) -> None:
     """Make sure the art is here before anything tries to draw with it.
 
-    The demo opens its heightmap before it opens a window, so this cannot wait
-    for a frame loop and there is no window to ask in -- which is why it asks on
-    the console and fetches in the foreground. One download, once; every later
-    run finds it and says nothing.
+    The demo opens its heightmap before it opens a window, so this asks on the
+    console and fetches in the foreground: the pack's title, size and terms,
+    then yes or no (``assume_yes`` skips the question, for a script). Every
+    later run finds the pack and says nothing. Declining, or a download that
+    fails, stops the program with a message saying what happened and how to
+    run from a local copy of the art instead.
     """
+    from OpenGLContext.contentpacks import application
+    from OpenGLContext.contentpacks.store import CONTENT_OVERRIDE
+
     from openglcontext_forest_demo import content
-    wanted = content.needed_to_start()
-    if not wanted:
-        return
-    from OpenGLContext.contentpacks import fetch as fetching
-    for pack in wanted:
-        print(f"Fetching {pack.title} ({pack.human_size()}) — {pack.copyright}")
-        sys.stdout.flush()
-        fetching.fetch_pack(pack, content.store(), progress=_reporter())
-        print("\r  done")
+    offline = (f"To run from a copy of the art you already have, point "
+               f"{CONTENT_OVERRIDE} at a directory holding "
+               f"{content.NAMESPACE}/art.")
+    try:
+        here = content.CONTENT.ensure_base(
+            consent=application.ask_on_console(assume_yes=assume_yes),
+            progress=application.console_progress())
+    except OSError as error:
+        raise SystemExit(f"\nThe forest art did not download: {error}\n"
+                         f"{offline}") from error
+    if not here:
+        raise SystemExit(f"Not downloading; the demo has nothing to draw "
+                         f"without its art. {offline}")
+    print("\r  done")
 
 
 def main() -> None:
     """Console entry point (``oglc-forest``): parse knobs, print attributions, run."""
-    Forest.config = config_from_args()
+    options = build_arg_parser().parse_args()
+    Forest.config = config_from_namespace(options)
     print_credits()
-    fetch_art()
+    fetch_art(assume_yes=options.yes)
     Forest.ContextMainLoop(definition=ContextDefinition(
         title=menu.TITLE, size=WINDOW_SIZE, movementModes=movement_modes()))
 

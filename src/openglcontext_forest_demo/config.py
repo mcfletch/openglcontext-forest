@@ -137,6 +137,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
                    choices=["auto", "high", "medhigh", "medium", "medlow", "low"],
                    default=d.quality,
                    help="render quality: auto measures fps to hold ~60; a rung name freezes it")
+    p.add_argument("--yes", action="store_true",
+                   help="on a first run, download the art without asking")
     return p
 
 
@@ -145,6 +147,12 @@ def config_from_args(argv: Sequence[str] | None = None) -> ForestConfig:
 
     The parser's namespace attribute names match the dataclass fields, so this is a
     direct rebuild — no per-knob wiring to drift out of sync."""
-    ns = build_arg_parser().parse_args(argv)
+    return config_from_namespace(build_arg_parser().parse_args(argv))
+
+
+def config_from_namespace(ns: argparse.Namespace) -> ForestConfig:
+    """The `ForestConfig` in a namespace `build_arg_parser` parsed.
+
+    Options that are not fields (``--yes``) are left for the caller."""
     names = {f.name for f in fields(ForestConfig)}
     return ForestConfig(**{k: v for k, v in vars(ns).items() if k in names})

@@ -35,7 +35,26 @@ oglc-forest
 # or: python -m openglcontext_forest_demo
 ```
 
-First launch fetches CC0 ground textures from ambientCG (cached afterwards).
+### The first run
+
+The demo's art (terrain, trees, impostors and ground cover) is a 66 MB content
+pack, not part of the wheel. The first run lists it on the console with its
+size and its terms and asks before downloading it; `--yes` answers for a
+script. It is kept in the per-user content store, and every later run starts
+without asking or reaching the network. The engine also fetches the CC0
+ground textures from ambientCG on the first launch and caches them.
+
+With no network, or if you decline, the demo stops before opening a window and
+says so. To run it offline, point `OPENGLCONTEXT_CONTENT` at a directory
+holding the art as `openglcontext-forest/art/` (an unpacked copy of the pack,
+or a copy of `src/openglcontext_forest_demo/assets` from a checkout with its LFS objects
+fetched):
+
+```bash
+OPENGLCONTEXT_CONTENT=/opt/forest-content oglc-forest
+```
+
+A checkout runs from its own `assets` directory while no pack is installed.
 
 ## Controls
 

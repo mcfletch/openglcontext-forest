@@ -60,17 +60,16 @@ import time
 from typing import Any
 
 os.environ.setdefault("OPENGLCONTEXT_RENDERER", "pbr")
-os.environ.setdefault("OPENGLCONTEXT_BACKEND", "glfw")
-from OpenGLContext import quaternion, testingcontext
+from OpenGLContext import quaternion
 from OpenGLContext.contentpacks import application
 from OpenGLContext.contentpacks.store import CONTENT_OVERRIDE
+from OpenGLContext.context import Context
 from OpenGLContext.contextdefinition import ContextDefinition
 from OpenGLContext.move import modes as movemodes
+from OpenGLContext.move.navigationdefinition import Navigation
 from OpenGLContext.move.terrainwalk import TerrainWalkMixin
 from OpenGLContext.ui import bindings, settings
 from OpenGLContext.ui.overlay import OverlayMixin
-
-BaseContext = testingcontext.getInteractive()
 
 from openglcontext_forest_demo import content, menu
 from openglcontext_forest_demo import quality as qual
@@ -96,12 +95,12 @@ FLY_SPEED = 30.0
 
 #: Keys that open a screen, and the method each opens.  On ``keyboard`` key-downs
 #: rather than ``keypress``: a function key produces no character, so a keypress
-#: binding for one is accepted and then never fires.
+#: binding for one is accepted and then never fires.  ``m``, which steps to the
+#: next way of moving, comes from the navigation (:func:`navigation`).
 SCREEN_KEYS = (
     ('<F6>', 'showBindings'),
     ('<F8>', 'cycleQuality'),
     ('<F10>', 'showSettings'),
-    ('m', 'cycleMovementMode'),
 )
 
 
@@ -123,8 +122,22 @@ def movement_modes() -> list[Any]:
     ]
 
 
-class Forest(OverlayMixin, TerrainWalkMixin,
-             BaseContext):  # type: ignore[misc,valid-type]  # base chosen at run time
+def navigation() -> Navigation:
+    """How the demo is moved through: its own modes, stepped through with ``m``.
+
+    No ``examine`` mode: the avatar walks the terrain, and the classic
+    free-fly camera would move the view the avatar is about to put back.
+    """
+    return Navigation(modes=movement_modes(), modeSwitching=['keys'])
+
+
+def definition() -> ContextDefinition:
+    """The window the demo opens: its title and size, and its navigation."""
+    return ContextDefinition(title=menu.TITLE, size=WINDOW_SIZE,
+                             navigation=navigation())
+
+
+class Forest(OverlayMixin, TerrainWalkMixin, Context):
     """Walk the forest: build the shared scene, then walk, look and stream.
 
     Thin glue over :func:`build_forest_scene` — swapping this navigation for a
@@ -138,6 +151,8 @@ class Forest(OverlayMixin, TerrainWalkMixin,
     under a menu somebody is reading.
     """
 
+    #: The window system the demo and the tools built on it open.
+    windowSystemName = 'glfw'
     config: ForestConfig | None = None   # set by main() (defaults for a bare run)
 
     def OnInit(self) -> None:
@@ -387,11 +402,6 @@ class Forest(OverlayMixin, TerrainWalkMixin,
             return existing
         return self.pushOverlay(menu.credits_screen(credits_text()))
 
-    def cycleMovementMode(self, event: Any = None) -> Any:  # noqa: ARG002 an event handler: a key binding passes the event
-        """Step to the next declared movement mode, as ``m`` does in twitch."""
-        navigation = self.getNavigation()
-        return navigation.cycle() if navigation is not None else None
-
     # -- streaming --------------------------------------------------------
     # Streamer methods delegate to the scene so a Forest subclass (bench, capture, a
     # driving demo) can drive the veg fields with the familiar self._stream_* names.
@@ -495,8 +505,7 @@ def main() -> None:
     Forest.config = config_from_namespace(options)
     print_credits()
     fetch_art(assume_yes=options.yes)
-    Forest.ContextMainLoop(definition=ContextDefinition(
-        title=menu.TITLE, size=WINDOW_SIZE, movementModes=movement_modes()))
+    Forest.ContextMainLoop(definition=definition())
 
 
 if __name__ == "__main__":

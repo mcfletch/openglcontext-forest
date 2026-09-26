@@ -71,7 +71,20 @@ def test_the_screen_keys_are_the_ones_every_other_program_here_uses():
     bound = {name: function for _kind, name, _state, function in recorder.bound}
     assert bound['<F6>'] == demo.showBindings
     assert bound['<F10>'] == demo.showSettings
-    assert bound['m'] == demo.cycleMovementMode
+
+
+def test_the_user_steps_through_the_modes_by_key():
+    """``m``, bound by the engine where the navigation says ``keys``."""
+    assert list(run.navigation().modeSwitching) == ['keys']
+
+
+def test_no_free_fly_camera_competes_with_the_avatar():
+    assert not run.navigation().examines()
+    assert [mode.name for mode in run.navigation().modes] == ['fps', 'walk', 'fly']
+
+
+def test_the_demo_and_its_tools_open_a_glfw_window():
+    assert run.Forest.windowSystemName == 'glfw'
 
 
 def test_the_screen_keys_are_bound_as_key_downs():

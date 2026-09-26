@@ -12,7 +12,6 @@ import os
 import sys
 import time
 
-os.environ.setdefault("OPENGLCONTEXT_BACKEND", "glfw")
 os.environ["OPENGLCONTEXT_DISABLE_FPS_DISPLAY"] = "1"
 import glfw
 import numpy as np

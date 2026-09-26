@@ -14,9 +14,10 @@ menu and ``F6``/``F10`` the key bindings and the rendering settings.
 Reuse the scene from a different navigation layer (e.g. a "driving through a forest"
 demo) by building it inside your own context and attaching your own controls::
 
+    from OpenGLContext.context import Context
     from openglcontext_forest_demo import ForestConfig, build_forest_scene
 
-    class Drive(SomeVehicleMixin, BaseContext):
+    class Drive(SomeVehicleMixin, Context):
         def OnInit(self):
             scene = build_forest_scene(ForestConfig(clump_radius=45.0))
             self.sg = scene.sceneGraph

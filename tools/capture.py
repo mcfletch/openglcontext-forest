@@ -9,7 +9,6 @@ import os
 import sys
 from typing import ClassVar
 
-os.environ.setdefault("OPENGLCONTEXT_BACKEND", "glfw")
 os.environ["OPENGLCONTEXT_DISABLE_FPS_DISPLAY"] = "1"
 import numpy as np
 import OpenGL.GL as gl

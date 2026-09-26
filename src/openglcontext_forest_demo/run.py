@@ -69,7 +69,6 @@ from OpenGLContext.move import modes as movemodes
 from OpenGLContext.move.navigationdefinition import Navigation
 from OpenGLContext.move.terrainwalk import TerrainWalkMixin
 from OpenGLContext.ui import bindings, settings
-from OpenGLContext.ui.overlay import OverlayMixin
 
 from openglcontext_forest_demo import content, menu
 from openglcontext_forest_demo import quality as qual
@@ -137,7 +136,7 @@ def definition() -> ContextDefinition:
                              navigation=navigation())
 
 
-class Forest(OverlayMixin, TerrainWalkMixin, Context):
+class Forest(TerrainWalkMixin, Context):
     """Walk the forest: build the shared scene, then walk, look and stream.
 
     Thin glue over :func:`build_forest_scene` — swapping this navigation for a
@@ -145,8 +144,8 @@ class Forest(OverlayMixin, TerrainWalkMixin, Context):
     is stashed by :func:`main` from the parsed command line before the context is
     created.
 
-    :class:`~OpenGLContext.ui.overlay.OverlayMixin` comes first so its event
-    routing runs before the navigation mix-in's: while a screen is up the
+    The overlay's event routing runs before the navigation's, as in every
+    context: while a screen is up the
     movement sampler is not fed at all, which is what stops the walk continuing
     under a menu somebody is reading.
     """

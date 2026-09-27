@@ -24,26 +24,41 @@ FRAMES = int(os.environ.get("PB_FRAMES", "220"))
 WARM = 30
 DISABLE = {f for f in os.environ.get("PB_DISABLE", "").split(",") if f}
 
+#: What PB_DISABLE may name.
+SUBSYSTEMS = ("grass", "clumps", "impostors", "near", "terrain")
+
+
+def subsystem_nodes(scene, names):
+    """The nodes the named subsystems of a ForestScene draw with.
+
+    Grass is each ground-cover species' near and far cards, clumps its
+    geometry at either level of detail.
+    """
+    rungs = scene.cover.rungs if scene.cover is not None else ()
+    found = []
+    if "grass" in names:
+        found += [node for rung in rungs for node in (rung.cards, rung.far_cards)]
+    if "clumps" in names:
+        found += [node for rung in rungs for node in (rung.clumps_near, rung.clumps_far)]
+    if "impostors" in names:
+        found += [node for node, *_ in scene.impostors]
+    if "near" in names:
+        found.append(scene.near)
+    if "terrain" in names:
+        found.append(scene.terrain_geom)
+    return [node for node in found if node is not None]
+
 
 class PB(demo.Forest):
     def OnInit(self):
         r = super().OnInit()
-        sc = self.scene
         # Subsystem disable for GPU attribution: the chosen nodes are not drawn.
-        def kill(node):
-            if node is not None:
-                node.drawn = False
-        if "grass" in DISABLE:
-            kill(sc.grass); kill(sc.grass_far)
-        if "clumps" in DISABLE:
-            kill(sc.clumps_near); kill(sc.clumps_far)
-        if "impostors" in DISABLE:
-            for node, *_ in sc.impostors:
-                kill(node)
-        if "near" in DISABLE:
-            kill(sc.near)
-        if "terrain" in DISABLE:
-            kill(sc.terrain_geom)
+        unknown = DISABLE.difference(SUBSYSTEMS)
+        if unknown:
+            raise SystemExit(f"PB_DISABLE names {', '.join(sorted(unknown))}; "
+                             f"it takes {', '.join(SUBSYSTEMS)}")
+        for node in subsystem_nodes(self.scene, DISABLE):
+            node.drawn = False
         self._idle_ms = []
         self._sub_ms = []
         self._gpu_ms = []

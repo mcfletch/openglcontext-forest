@@ -35,7 +35,7 @@ from OpenGLContext.scenegraph.vegetation import (
     InstancedBillboards,
     InstancedMeshLOD,
 )
-from OpenGLContext.scenegraph.vegetation.cover import COVER_MANIFEST, read_cover_manifest
+from OpenGLContext.scenegraph.vegetation.cover import read_cover_manifest
 from PIL import Image
 
 from openglcontext_forest_demo import content
@@ -46,11 +46,6 @@ from openglcontext_forest_demo.config import ForestConfig
 #: built, since a first run imports this module before the art has arrived.
 HEIGHTMAP = "forest_height.png"
 CONTROL = "forest_control.png"
-#: What grows between the trees, and how much of each there is. Baked from CC0
-#: scans by ``oglc-bake-plants``; see ASSET-LICENSES.md. The set is read from
-#: the art rather than listed here, so re-baking it with another plant in it
-#: needs no code change.
-COVER = COVER_MANIFEST
 LAYERS = ["forest_floor", "grass", "rock", "moss"]
 
 # Fixed handoff geometry that keeps the LOD cross-fades seamless — not user knobs:

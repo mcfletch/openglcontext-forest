@@ -6,6 +6,7 @@ build/
 dist/
 .eggs/
 .venv/
+.claude/
 venv/
 
 # dev-tool output

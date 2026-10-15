@@ -33,7 +33,7 @@ class Bench(demo.Forest):
             sys.stdout.flush()   # os._exit skips the buffers: piped, the numbers vanish
             os._exit(0)
         return r
-    def OnIdle(self,*_a):
+    def OnIdle(self, *arguments):  # noqa: ARG002 Context.OnIdle's signature
         # auto-walk forward so the benchmark reflects motion (streaming/redraw cost)
         if self.platform is not None:
             self._walk+=0.6

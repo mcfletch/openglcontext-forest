@@ -69,7 +69,7 @@ class PB(demo.Forest):
         self._t_idle = 0.0
         return r
 
-    def OnIdle(self, *_a):
+    def OnIdle(self, *arguments):  # noqa: ARG002 Context.OnIdle's signature
         t0 = time.perf_counter()
         if self.platform is not None:
             self._walk += 0.6

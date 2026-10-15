@@ -294,7 +294,7 @@ class Forest(TerrainWalkMixin, Context):
         fx, fz = self._tw_forward()
         self._imp_stream.request(x, z, fx, fz)
 
-    def OnIdle(self, *a: Any) -> Any:
+    def OnIdle(self, *arguments: Any) -> Any:
         """Apply a deferred auto-quality change on the first move, then walk/stream."""
         if self._pending_quality is not None and self.platform is not None:
             xz = self._tw_xz()
@@ -303,7 +303,7 @@ class Forest(TerrainWalkMixin, Context):
                 self._flush_pending_quality()
             self._last_xz = xz
         sup = super()
-        return sup.OnIdle(*a) if hasattr(sup, 'OnIdle') else None
+        return sup.OnIdle(*arguments) if hasattr(sup, 'OnIdle') else None
 
     def OnDraw(self, *a: Any, **k: Any) -> Any:
         """Render, and while auto-quality is measuring, time one window and decide."""

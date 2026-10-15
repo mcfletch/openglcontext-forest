@@ -34,7 +34,7 @@ class Cap(demo.Forest):
             self._shots.append((wx, wz))
         return r
 
-    def OnIdle(self, *_a):
+    def OnIdle(self, *arguments):  # noqa: ARG002 Context.OnIdle's signature
         if self.platform is None:
             return
         wx, wz = self._shots[self._i]

@@ -179,7 +179,7 @@ class Forest(TerrainWalkMixin, Context):
         self.init_walk(scene.ground, scene.collider_pos, scene.collider_radius)
         # The rocks are made as the walker nears them, so what stops the walker comes from
         # the field rather than from the fixed trunk table.
-        self.add_collider_source(scene.rocks.colliders_near)
+        self.add_collider_source(scene.rocks.mounds_near)
         self.setupPhysics(enable=True)
         self.setupScreenshotKey()
         self.bindScreenKeys()

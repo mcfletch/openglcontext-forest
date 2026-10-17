@@ -65,6 +65,7 @@ from OpenGLContext.contentpacks import application
 from OpenGLContext.contentpacks.store import CONTENT_OVERRIDE
 from OpenGLContext.context import Context
 from OpenGLContext.contextdefinition import ContextDefinition
+from OpenGLContext.loaders import cc0
 from OpenGLContext.move import modes as movemodes
 from OpenGLContext.move.navigationdefinition import Navigation
 from OpenGLContext.move.terrainwalk import TerrainWalkMixin
@@ -175,7 +176,10 @@ class Forest(TerrainWalkMixin, Context):
         # Walk: the avatar stands on the height field, is blocked by the trunks,
         # and streams the vegetation as it moves.  After the camera is placed,
         # because that is where the avatar is stood up.
-        self.init_walk(scene.hf, scene.collider_pos, scene.collider_radius)
+        self.init_walk(scene.ground, scene.collider_pos, scene.collider_radius)
+        # The rocks are made as the walker nears them, so what stops the walker comes from
+        # the field rather than from the fixed trunk table.
+        self.add_collider_source(scene.rocks.colliders_near)
         self.setupPhysics(enable=True)
         self.setupScreenshotKey()
         self.bindScreenKeys()
@@ -315,6 +319,7 @@ class Forest(TerrainWalkMixin, Context):
         # cached scatter), so the disc tracks the walk with no streaming lag -- the
         # leading clumps fade in through the LOD band instead of popping up in density.
         if self.platform is not None:
+            self.scene.update_rocks(self.platform.position[:3], float(max(1, self.getViewPort()[1])))
             try:
                 self.scene.update_clump_lod(*self._tw_xz())
             except Exception:  # noqa: BLE001, S110 -- best-effort re-center; never crash the draw
@@ -496,6 +501,9 @@ def fetch_art(assume_yes: bool = False) -> None:
         raise SystemExit(f"Not downloading; the demo has nothing to draw "
                          f"without its art. {offline}")
     print("\r  done")
+    # The ground's photographs come from the engine's texture pack where it is offered, so
+    # that ambientCG is not asked for them. Declining leaves the demo to fetch them as it did.
+    cc0.ensure_pack(consent=application.ask_on_console(assume_yes=assume_yes))
 
 
 def main() -> None:

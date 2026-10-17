@@ -20,7 +20,9 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+from OpenGLContext.loaders import cc0
 from OpenGLContext.loaders.tiles3d import vegetation
+from OpenGLContext.scenegraph import surfaces
 from OpenGLContext.scenegraph.basenodes import (
     Appearance,
     Background,
@@ -28,7 +30,9 @@ from OpenGLContext.scenegraph.basenodes import (
     Shape,
     sceneGraph,
 )
-from OpenGLContext.scenegraph.terrain import HeightField, SplatTerrain
+from OpenGLContext.scenegraph.rockfield import RockField
+from OpenGLContext.scenegraph.rockground import RockGround, RockyGround, beneath
+from OpenGLContext.scenegraph.terrain import HeightField, RockRelief, SplatTerrain
 from OpenGLContext.scenegraph.vegetation import (
     CoverSpecies,
     GroundCover,
@@ -48,6 +52,13 @@ HEIGHTMAP = "forest_height.png"
 CONTROL = "forest_control.png"
 LAYERS = ["forest_floor", "grass", "rock", "moss"]
 
+#: The control map's rock weight at which fine rock ground begins and is whole. The terrain's
+#: splat shows rock from about a tenth, so the fine ground has to begin there.
+ROCK_BEGINS = 0.1
+ROCK_WHOLE = 0.5
+#: Darkens the rock photograph to the weathered grey the terrain's rock layer shows.
+ROCK_TINT = (0.62, 0.62, 0.65)
+
 # Fixed handoff geometry that keeps the LOD cross-fades seamless — not user knobs:
 # nudging these desyncs the geometry->billboard blend, so they stay constants.
 TREE_SCATTER_SEED = 7          # tree layout seed (holds the shipped forest arrangement)
@@ -63,7 +74,10 @@ SINK = np.array([0.10, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.17, 0.0
 
 
 def _shape(geometry: Any) -> Shape:
-    return Shape(geometry=geometry, appearance=Appearance(material=Material()))
+    """``geometry`` as a node the pass draws. None of it casts a shadow: the terrain's are
+    baked into it, and the trees and the cover are drawn into no shadow map, while a bound as
+    wide as the forest would stretch every cascade of the sun's shadows over all of it."""
+    return Shape(geometry=geometry, appearance=Appearance(material=Material()), castShadow=False)
 
 
 def _trunk_metrics(npz_path: str,
@@ -105,6 +119,13 @@ class ForestScene:
     #: through the whole distance chain. The engine owns the chain; this scene
     #: says what grows, where it may, and how dark it is under the canopy.
     cover: GroundCover
+    #: Rocks, made around the camera as it walks (see :meth:`update_rocks`).
+    rocks: RockField
+    #: Bare rock meshed finely near the camera (see :meth:`update_rocks`), and the ground
+    #: that stands for what it draws: what the walker stands on and the plants and stones
+    #: are seated on.
+    rock_ground: RockGround
+    ground: RockyGround
     grass_mask: Callable
     impostor_cos: float
     near_mesh_radius: float
@@ -151,6 +172,12 @@ class ForestScene:
         cover, near_pending = payload
         self.cover.apply_near(cover)
         self.near.stage(near_pending)
+
+    def update_rocks(self, eye: Any, viewport_height: float) -> None:
+        """Make the rocks and the rocky ground near the camera and drop those it has left. Every
+        frame, GL current."""
+        self.rock_ground.update_for_camera(eye, viewport_height)
+        self.rocks.update_for_camera(eye, viewport_height)
 
     def update_clump_lod(self, x: float, z: float) -> None:
         """Re-centre the drawn cover geometry on the live camera. Every frame.
@@ -227,15 +254,24 @@ def build_forest_scene(config: ForestConfig,
 
     hf = HeightField.from_image(A(HEIGHTMAP), config.res, config.extent, config.relief)
     hfn = hf.sample
-    terrain_geom = SplatTerrain(hf, LAYERS, A(CONTROL))
+    # Each channel is resized alone: the map's fourth channel is a layer's weight, not
+    # opacity, and an RGBA resize would multiply the other three by it.
+    _ctl = np.stack([np.asarray(channel.resize((config.res, config.res), Image.Resampling.LANCZOS),
+                                np.float32) / 255.0
+                     for channel in Image.open(A(CONTROL)).convert("RGBA").split()], axis=-1)
+    # Where the control map says the ground is rock it is rock. The fine rock ground (below) is
+    # drawn over the coarse terrain, so the coarse terrain is drawn from the field lowered under
+    # it: the two never lie together.
+    rock_weight = HeightField(_ctl[..., LAYERS.index("rock")], config.extent, 1.0).sample
+    relief = RockRelief(where=rock_weight, height=config.rock_height, begins=ROCK_BEGINS,
+                        whole=ROCK_WHOLE, seed=config.seed)
+    terrain_geom = SplatTerrain(beneath(hf, relief), LAYERS, A(CONTROL))
     terrain = _shape(terrain_geom)
 
     # Grass grows on any soft ground (forest floor, meadow, moss) but NOT on rock:
     # scatter is thinned by (1 - rock weight) from the control map, so it stays lush
     # where you walk yet vanishes on bare mountainsides instead of dotting them with
     # green blobs. Reuses the HeightField sampler to read the map over the extent.
-    _ctl = np.asarray(Image.open(A(CONTROL)).convert("RGBA").resize((config.res, config.res), Image.Resampling.LANCZOS),
-                      np.float32) / 255.0
     _grass_allowed = np.clip(1.0 - _ctl[..., LAYERS.index("rock")], 0.0, 1.0)
     _rock_mask = HeightField(_grass_allowed, config.extent, 1.0).sample
 
@@ -361,11 +397,24 @@ def build_forest_scene(config: ForestConfig,
     kinds = sorted({one.name.rsplit('_', 1)[0] for one in cover.species})
     print(f"ground cover: {len(cover.species)} kinds — {', '.join(kinds)}")
 
+    # The rock ground: the same ground meshed finely, with faces scraped into it and a rock
+    # material, drawn over the coarse terrain. Everything that stands on the ground stands on
+    # that surface. Stones and boulders lie on it too, thick and large on rock and scattered
+    # among the trees elsewhere.
+    rock_material = cc0.physical_material("rock", tint=ROCK_TINT) or surfaces.pbr_material(
+        surfaces.sandstone(256, colour=(0.34, 0.33, 0.31), seed=9), relief=3.0, metallic=0.0)
+    rock_ground = RockGround(hf, relief, rock_material, reach=config.rock_ground_reach)
+    ground = rock_ground.ground
+    rockiness = HeightField(np.clip(0.06 + 0.94 * _ctl[..., LAYERS.index("rock")], 0.0, 1.0),
+                            config.extent, 1.0).sample
+    rocks = RockField(ground, rock_material, reach=config.rock_reach, mask=rockiness,
+                      density=config.rock_density, sizes=(0.15, 1.6), seed=config.seed)
+
     sg = sceneGraph(children=[
         Background(skyColor=[[0.28, 0.46, 0.72], [0.52, 0.66, 0.82], [0.80, 0.87, 0.93]],
                    skyAngle=[1.15, 1.5708],
                    groundColor=[[0.68, 0.76, 0.80], [0.62, 0.70, 0.74]], groundAngle=[1.5708]),
-        terrain, cover] + tree_nodes)
+        terrain, rock_ground, cover, rocks] + tree_nodes)
 
     # collider: the cylinder must sit on the *visible* trunk, not the mesh origin.
     # Some models put the trunk off-centre (buttress roots, lean), so we measure each
@@ -381,7 +430,8 @@ def build_forest_scene(config: ForestConfig,
 
     return ForestScene(
         config=config, sceneGraph=sg, hf=hf, terrain_geom=terrain_geom, near=near,
-        impostors=impostors, cover=cover, grass_mask=grass_mask,
+        impostors=impostors, cover=cover, rocks=rocks, rock_ground=rock_ground, ground=ground,
+        grass_mask=grass_mask,
         impostor_cos=impostor_cos, near_mesh_radius=config.near_mesh_radius,
         collider_pos=collider_pos, collider_radius=collider_radius,
         near_species=near_species, spawn=(ex, ez))

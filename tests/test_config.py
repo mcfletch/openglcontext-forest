@@ -48,6 +48,7 @@ def test_defaults_match_documented_values():
         "tree_scale_min": 0.75, "tree_scale_max": 1.45,
         "clump_radius": 30.0, "grass_card_radius": 95.0, "grass_far_radius": 700.0,
         "cover_density": 1.0,
+        "rock_density": 0.03, "rock_reach": 140.0, "rock_height": 0.8, "rock_ground_reach": 110.0,
         "impostor_cone_deg": 75.0, "near_mesh_radius": 56.0,
         "fov_deg": 62.0, "eye_height": 1.7, "near": 0.25, "far": 9000.0,
         "seed": 1,
@@ -118,3 +119,8 @@ def test_build_forest_scene_smoke():
     scene.stream_near(ex, ez)
     scene.stream_far(ex, ez)
     scene.stream_impostors(ex, ez, 1.0, 0.0)
+
+
+def test_rock_flags_set_the_rock_fields():
+    cfg = config_from_args(["--rock-density", "0.05", "--rock-reach", "90"])
+    assert (cfg.rock_density, cfg.rock_reach) == (0.05, 90.0)

@@ -5,7 +5,8 @@ A walkable, forest demo for
 elevation under a runtime multi-layer **splat terrain**, a GPU-instanced forest with
 distance **LOD** (real tree *meshes* near you, baked *impostor* billboards far off),
 a camera-following **forest floor** of grass, fern, nettle, periwinkle and shrub,
-terrain sun-shadows and canopy shade, and
+terrain sun-shadows and canopy shade, bare rock ground meshed finely around you with faces
+scraped into it (`RockGround`), boulders and fallen rock made as you walk, and
 **mouse-look walking** with gravity (ground-clamped, blocked by trunks). ~230k trees,
 comfortably above 60 fps.
 
@@ -127,6 +128,10 @@ tree cover it grows under — so ferns stand in beds in the shade, shrubs take t
 gaps where the trees thin out and the edges of clearings, grass runs through all
 of it and periwinkle flowers through the grass. `--cover-density` scales the whole
 set at once.
+
+`--rock-density`, `--rock-reach`, `--rock-height` and `--rock-ground-reach` set the rocks: how
+many lie about, how far from you they and the finely meshed rock ground are made, and how high
+bare rock stands.
 
 What grows is read from `assets/cover.json`, which `oglc-bake-plants` (in
 `openglcontext-editor`) writes beside the models it names, so changing the mix is a

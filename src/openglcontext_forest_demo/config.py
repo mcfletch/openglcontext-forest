@@ -47,6 +47,14 @@ class ForestConfig:
     grass_far_radius: float = 700.0   # coarse far-cover disc radius, metres
     cover_density: float = 1.0        # multiplier on every species' own density
 
+    # --- rocks ---
+    # Where the ground is rock the rocks are many and large; elsewhere there are
+    # stones among the trees. Density is rocks per m^2 on bare rock.
+    rock_density: float = 0.03        # rocks per m^2 where the ground is rock
+    rock_reach: float = 140.0         # how far from the camera rocks are made, metres
+    rock_height: float = 0.8          # how high bare rock stands above the ground, metres
+    rock_ground_reach: float = 110.0  # how far from the camera bare rock is meshed finely, metres
+
     # --- LOD ---
     impostor_cone_deg: float = 75.0   # forward view-cone half-angle for impostor culling, degrees
     near_mesh_radius: float = 56.0    # radius the near-mesh trees follow the camera, metres
@@ -113,6 +121,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
                    help="coarse far-cover disc radius (m)")
     g.add_argument("--cover-density", dest="cover_density", type=float, default=d.cover_density,
                    help="multiplier on every cover species' own density")
+
+    r = p.add_argument_group("rocks")
+    r.add_argument("--rock-density", dest="rock_density", type=float, default=d.rock_density,
+                   help="rocks per m^2 where the ground is rock (0 for none)")
+    r.add_argument("--rock-reach", dest="rock_reach", type=float, default=d.rock_reach,
+                   help="how far from the camera rocks are made (m)")
+    r.add_argument("--rock-height", dest="rock_height", type=float, default=d.rock_height,
+                   help="how high bare rock stands above the ground (m)")
+    r.add_argument("--rock-ground-reach", dest="rock_ground_reach", type=float,
+                   default=d.rock_ground_reach,
+                   help="how far from the camera bare rock is meshed finely (m)")
 
     lod = p.add_argument_group("LOD")
     lod.add_argument("--impostor-cone-deg", "--impostor-cone", dest="impostor_cone_deg", type=float,

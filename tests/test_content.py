@@ -106,6 +106,7 @@ class TestTheFirstRunOnTheConsole:
         monkeypatch.setattr(userpaths, "appdatadirectory",
                             lambda: str(tmp_path / "appdata"))
         monkeypatch.delenv("OPENGLCONTEXT_CONTENT", raising=False)
+        monkeypatch.setattr(content.CONTENT, "fallback", None)   # no checkout copy of the art
         fetched = []
 
         def offline(url, *_args, **_named):
@@ -142,3 +143,23 @@ class TestTheFirstRunOnTheConsole:
         with pytest.raises(SystemExit):
             run.fetch_art(assume_yes=True)
         assert nothing_here, "it went ahead"
+
+    @pytest.mark.usefixtures("nothing_here")
+    def test_both_packs_are_offered_on_one_question(self, monkeypatch, capsys) -> None:
+        questions = []
+        monkeypatch.setattr("builtins.input", lambda prompt: questions.append(prompt) or "n")
+        with pytest.raises(SystemExit):
+            run.fetch_art()
+        said = capsys.readouterr().out
+        assert len(questions) == 1
+        assert said.count("Forest demo art") == 1 and said.count("CC0 PBR textures") == 1
+
+    @pytest.mark.usefixtures("nothing_here")
+    def test_a_checkout_holding_the_art_is_asked_only_about_the_textures(
+            self, monkeypatch, capsys, tmp_path) -> None:
+        monkeypatch.setattr(content.CONTENT, "fallback", str(tmp_path))
+        monkeypatch.setattr("builtins.input", lambda _prompt: "n")
+        with pytest.raises(SystemExit):
+            run.fetch_art()
+        said = capsys.readouterr().out
+        assert "Forest demo art" not in said and "CC0 PBR textures" in said

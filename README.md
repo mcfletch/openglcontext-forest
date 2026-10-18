@@ -38,12 +38,11 @@ oglc-forest
 
 ### The first run
 
-The demo's art (terrain, trees, impostors and ground cover) is a 66 MB content
-pack, not part of the wheel. The first run lists it on the console with its
-size and its terms and asks before downloading it; `--yes` answers for a
-script. It is kept in the per-user content store, and every later run starts
-without asking or reaching the network. The engine also fetches the CC0
-ground textures from ambientCG on the first launch and caches them.
+The demo runs on two content packs, neither part of the wheel: its own art (terrain, trees,
+impostors and ground cover, 66 MB) and the engine's CC0 photographic ground textures
+(44 MB). The first run lists what is missing on the console with its sizes and terms and asks
+once before downloading it; `--yes` answers for a script. The packs are kept in the per-user
+content store, and every later run starts without asking or reaching the network.
 
 With no network, or if you decline, the demo stops before opening a window and
 says so. To run it offline, point `OPENGLCONTEXT_CONTENT` at a directory

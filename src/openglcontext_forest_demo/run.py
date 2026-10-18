@@ -478,32 +478,34 @@ def print_controls() -> None:
 
 
 def fetch_art(assume_yes: bool = False) -> None:
-    """Make sure the art is here before anything tries to draw with it.
+    """Make sure the packs the demo runs on are here before anything tries to draw with them.
 
-    The demo opens its heightmap before it opens a window, so this asks on the
-    console and fetches in the foreground: the pack's title, size and terms,
-    then yes or no (``assume_yes`` skips the question, for a script). Every
-    later run finds the pack and says nothing. Declining, or a download that
-    fails, stops the program with a message saying what happened and how to
-    run from a local copy of the art instead.
+    The demo's own art and the engine's photographic textures. The demo opens its heightmap
+    before it opens a window, so this asks on the console and fetches in the foreground: each
+    missing pack's title, size and terms once, then yes or no (``assume_yes`` skips the
+    question, for a script). Every later run finds the packs and says nothing. Declining, or a
+    download that fails, stops the program with a message saying what happened and how to run
+    from a local copy of the art instead.
     """
     offline = (f"To run from a copy of the art you already have, point "
                f"{CONTENT_OVERRIDE} at a directory holding "
                f"{content.NAMESPACE}/art.")
+
+    def announce(pack: Any) -> None:
+        print(f"\n  {pack.title}")
+
     try:
-        here = content.CONTENT.ensure_base(
+        here = application.ensure_needs(
+            [*content.CONTENT.needs(), *cc0.pack_needs()],
             consent=application.ask_on_console(assume_yes=assume_yes),
-            progress=application.console_progress())
+            progress=application.console_progress(), started=announce)
     except OSError as error:
-        raise SystemExit(f"\nThe forest art did not download: {error}\n"
+        raise SystemExit(f"\nThe demo's art did not download: {error}\n"
                          f"{offline}") from error
     if not here:
         raise SystemExit(f"Not downloading; the demo has nothing to draw "
                          f"without its art. {offline}")
     print("\r  done")
-    # The ground's photographs come from the engine's texture pack where it is offered, so
-    # that ambientCG is not asked for them. Declining leaves the demo to fetch them as it did.
-    cc0.ensure_pack(consent=application.ask_on_console(assume_yes=assume_yes))
 
 
 def main() -> None:

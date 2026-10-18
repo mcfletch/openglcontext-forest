@@ -9,9 +9,9 @@
    "archive": "tar",
    "approximate_bytes": 68702454,
    "sha256": "e747c495b6033a6cc58b81858bd1412ad5eba9df38707ba740e1da73d00b5525",
-   "base": true,
    "copyright": "Tree models by Georgeous, 3D Error 404 and LOLIPOP (CC-BY 4.0); ground cover plants from Poly Haven and ground materials from ambientCG (both CC0 1.0); terrain and impostors generated for this demo. Full attribution in CREDITS.txt inside the pack.",
    "marker": "forest_height.png",
+   "base": true,
    "notes": "The terrain, the trees and their impostors, and the plants that grow between them. Fetched before the first frame, because the demo opens its heightmap before it opens a window."
   }
  ]

@@ -9,7 +9,7 @@ covers the whole of that:
     ./release-assets.py                   # build the archive and its registry
     ./release-assets.py --install         # ...and put it in this machine's store
     ./release-assets.py --reinstall       # ...replacing the copy installed there
-    ./release-assets.py --push            # ...attach it to the release tag and
+    ./release-assets.py --push            # ...attach it to its release and
                                           #    write the shipped packs.json
 
 ``--install`` is what makes a content release testable before it is a release:
@@ -66,7 +66,7 @@ RELEASE = publish.Release(
     url="https://github.com/mcfletch/openglcontext-forest/releases/download/"
         "%s/%s",
     catalog=CATALOG, declare=declare,
-    into=os.path.join(HERE, "dist", "content"), tag="content-v2",
+    into=os.path.join(HERE, "dist", "content"),
     description=__doc__.split("\n\n")[0], title="Forest demo art",
     notes="The art `openglcontext-forest` fetches on its first run. Terms are "
           "in the registry and in CREDITS.txt inside the pack.")

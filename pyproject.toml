@@ -25,7 +25,7 @@ dependencies = [
     # the glTF loader, so this package imports neither itself. The floor names
     # the pre-release because an installer skips one it was not asked for by
     # name.
-    "OpenGLContext[glfw,gltf]>=3.0.0a6",
+    "OpenGLContext[glfw,gltf]>=3.0.0a7",
     "numpy>=2.0",
     "pillow",
     "PyOpenGL>=4.0.0a8",

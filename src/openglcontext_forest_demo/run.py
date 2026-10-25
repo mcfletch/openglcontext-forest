@@ -12,6 +12,7 @@ Controls:
 - ``m`` cycles to the walk and fly modes
 - ``f`` flies
 - ``g`` hands the camera to the free-fly navigator and back
+- ``b`` throws a boulder
 - ``F6`` shows the keys and lets them be rebound
 - ``F8`` cycles the render-quality preset (low / medium / high)
 - ``F10`` the rendering settings
@@ -19,7 +20,10 @@ Controls:
 - ``Alt+F`` the developer overlay
 - ``Escape`` the menu
 
-You walk on the terrain (height-clamped, blocked by trunks). Real
+You walk on the terrain (blocked by trunks, climbing the smaller rocks). The ground,
+the trunks and the rocks are bodies in the context's physics world, so a boulder
+thrown from the camera lands on the ground, rolls against the trunks and comes to
+rest. Real
 Great-Smoky-Mountains elevation drives the terrain; the ground is a runtime
 multi-layer splat (forest_floor/grass/rock/moss). The forest is GPU-instanced with
 distance LOD: real 3D tree *meshes* near the camera, baked *impostor* billboards
@@ -40,6 +44,8 @@ OpenGLContext::
                                           InstancedClumps, world_grid_scatter
   OpenGLContext.move.terrainwalk        — TerrainWalkMixin (the avatar, the
                                           ground, the trunks and the streaming)
+  OpenGLContext.physics.landscape       - the ground, the trunks and the rocks as
+                                          bodies in the physics world
   OpenGLContext.ui                      — the overlay screens
 
 Tree assets (CC-BY, full attribution in CREDITS.txt, which is what the credits
@@ -59,6 +65,8 @@ import sys
 import time
 from typing import Any
 
+import numpy as np
+
 os.environ.setdefault("OPENGLCONTEXT_RENDERER", "pbr")
 from OpenGLContext import quaternion
 from OpenGLContext.contentpacks import application
@@ -73,6 +81,7 @@ from OpenGLContext.ui import bindings, settings
 
 from openglcontext_forest_demo import content, menu
 from openglcontext_forest_demo import quality as qual
+from openglcontext_forest_demo.boulders import Boulders
 from openglcontext_forest_demo.config import (
     ForestConfig,
     build_arg_parser,
@@ -97,6 +106,9 @@ FLY_SPEED = 30.0
 #: rather than ``keypress``: a function key produces no character, so a keypress
 #: binding for one is accepted and then never fires.  ``m``, which steps to the
 #: next way of moving, comes from the navigation (:func:`navigation`).
+#: The key that throws a boulder from the camera.
+THROW_KEY = 'b'
+
 SCREEN_KEYS = (
     ('<F6>', 'showBindings'),
     ('<F8>', 'cycleQuality'),
@@ -154,6 +166,8 @@ class Forest(TerrainWalkMixin, Context):
     #: The window system the demo and the tools built on it open.
     windowSystemName = 'glfw'
     config: ForestConfig | None = None   # set by main() (defaults for a bare run)
+    #: The boulders thrown so far, made at the first throw.
+    _boulders: Boulders | None = None
 
     def OnInit(self) -> None:
         # Uncap the loop, for benching and because a forced redraw blocks on
@@ -183,6 +197,7 @@ class Forest(TerrainWalkMixin, Context):
         self.setupPhysics(enable=True)
         self.setupScreenshotKey()
         self.bindScreenKeys()
+        self.addEventHandler('keyboard', name=THROW_KEY, state=1, function=self.throwBoulder)
         # Register the SAME reusable streamers a driving demo would; impostor
         # culling needs the camera forward vector, which this navigation supplies.
         # Off-thread stream recompute: the scatter is pure numpy (GIL-released while
@@ -345,6 +360,16 @@ class Forest(TerrainWalkMixin, Context):
                 self.triggerRedraw(1)
         return r
 
+    def throwBoulder(self, event: Any = None) -> None:  # noqa: ARG002 an event handler: a key binding passes the event
+        """Throw a boulder from the camera along the way it looks."""
+        if self.platform is None:
+            return
+        if self._boulders is None:
+            self._boulders = Boulders(self.physics, self.sg, self.scene.rock_material)
+        forward = np.asarray(self.platform.forward(), dtype=float)
+        eye = np.asarray(self.platform.position[:3], dtype=float)
+        self._boulders.throw(eye + forward * 1.2, forward)
+
     # -- the screens ------------------------------------------------------
     def bindScreenKeys(self, context: Any = None) -> None:
         """Bind the keys that open a screen or change the way you move.
@@ -470,7 +495,7 @@ def print_credits() -> None:
 def print_controls() -> None:
     """Say what the keys do, for someone who ran it from a terminal."""
     sys.stdout.write(
-        "  mouse steers, w a s d move, shift runs, space jumps\n"
+        "  mouse steers, w a s d move, shift runs, space jumps, b throws a boulder\n"
         "  m cycles walk / fly / mouse-look, f flies, g free-fly camera\n"
         "  F6 keys, F8 quality, F10 rendering settings, F2 "
         "screenshot, alt+f developer overlay, escape menu\n")

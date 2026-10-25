@@ -70,6 +70,7 @@ You start in **mouse-look**: the pointer steers and the forest is walked, not fl
 | `m` | cycle the way you move: mouse-look, walk (`q`/`e` turn), fly |
 | `f` | fly (noclip) on/off |
 | `g` | hand the camera to the free-fly navigator, and back |
+| `b` | throw a boulder from the camera |
 | `escape` | the menu: Resume, Controls, Settings, Asset credits, Quit |
 | `F6` / `F10` | the key bindings / the rendering settings |
 | `F8` | cycle the render-quality preset (low / medium / high) |

@@ -133,6 +133,8 @@ class ForestScene:
     collider_radius: np.ndarray
     near_species: list[dict[str, Any]]
     spawn: tuple                     # (ex, ez) walkable spawn point
+    #: What the rocks wear, which a boulder thrown into the forest wears too.
+    rock_material: Any = None
 
     # --- reusable camera-following streamers (register on the move loop) ---
     # Each field splits into a pure ``compute_*`` (the numpy scatter/cull — GL-free,
@@ -434,7 +436,7 @@ def build_forest_scene(config: ForestConfig,
         grass_mask=grass_mask,
         impostor_cos=impostor_cos, near_mesh_radius=config.near_mesh_radius,
         collider_pos=collider_pos, collider_radius=collider_radius,
-        near_species=near_species, spawn=(ex, ez))
+        near_species=near_species, spawn=(ex, ez), rock_material=rock_material)
 
 
 def cover_species(art: str | None = None) -> list[CoverSpecies]:

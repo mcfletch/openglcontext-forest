@@ -7,8 +7,10 @@ distance **LOD** (real tree *meshes* near you, baked *impostor* billboards far o
 a camera-following **forest floor** of grass, fern, nettle, periwinkle and shrub,
 terrain sun-shadows and canopy shade, bare rock ground meshed finely around you with faces
 scraped into it (`RockGround`), boulders and fallen rock made as you walk, and
-**mouse-look walking** with gravity (ground-clamped, blocked by trunks). ~230k trees,
-comfortably above 60 fps.
+**mouse-look walking** with gravity. The ground, the trunks and the rocks are bodies
+in the engine's physics world, so the walker is stopped by trunks and climbs the
+smaller rocks, and a boulder thrown from the camera (`b`) lands on the ground and
+strikes the trees. ~230k trees, comfortably above 60 fps.
 
 The generic engine lives in OpenGLContext — `OpenGLContext.scenegraph.terrain` and
 `.vegetation` for the world, `OpenGLContext.move.terrainwalk` for the avatar that

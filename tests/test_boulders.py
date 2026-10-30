@@ -74,7 +74,7 @@ def test_boulders_differ_in_size_and_shape(physics):
     thrown = boulders(physics)
     first = thrown.throw((0.0, 10.0, 0.0), (1.0, 0.0, 0.0))
     second = thrown.throw((0.0, 10.0, 5.0), (1.0, 0.0, 0.0))
-    assert first.proxy.shape.radius != second.proxy.shape.radius
+    assert first.proxy.params['radius'] != second.proxy.params['radius']
 
 
 def test_throwing_in_a_direction_with_no_length_is_refused(physics):

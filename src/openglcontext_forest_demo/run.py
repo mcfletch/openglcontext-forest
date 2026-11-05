@@ -20,10 +20,10 @@ Controls:
 - ``Alt+F`` the developer overlay
 - ``Escape`` the menu
 
-You walk on the terrain (blocked by trunks, climbing the smaller rocks). The ground,
-the trunks and the rocks are bodies in the context's physics world, so a boulder
-thrown from the camera lands on the ground, rolls against the trunks and comes to
-rest. Real
+You walk on the terrain (blocked by trunks, climbing the smaller rocks). The ground is a
+body in the context's physics world, and the trunks and the rocks are bodies while you are
+within reach of them, so a boulder thrown from the camera lands on the ground, rolls
+against the trunks near it and comes to rest. Real
 Great-Smoky-Mountains elevation drives the terrain; the ground is a runtime
 multi-layer splat (forest_floor/grass/rock/moss). The forest is GPU-instanced with
 distance LOD: real 3D tree *meshes* near the camera, baked *impostor* billboards
